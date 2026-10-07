@@ -326,6 +326,7 @@ header.top .tabs{margin-top:18px}
   html,body{overflow-x:clip}
   .btn:hover{border-color:color-mix(in srgb,var(--fg) 40%,var(--line))}
 }
+.results li.more{display:flex;justify-content:center;padding:12px;border-bottom:0}
 /* show a card */
 .row-photo{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .row-photo .btn.sm{min-height:40px;padding:0 16px;flex:none}
@@ -1925,7 +1926,7 @@ let searchLang = store.get('lang') || '';
 const langBars = [];
 function paintLangs(){ langBars.forEach(bar=>bar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l === searchLang))); }
 function makeSearch(input, list, kind, onPick){
-  let timer, ctrl, items = [], active = -1;
+  let timer, ctrl, items = [], active = -1, total = 0, lastQ = '';
   const bar = document.createElement('div'); bar.className = 'langs'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Language');
   [['','All'],['en','English'],['jp','Japanese'],['cn','Chinese']].forEach(([l,t])=>{
     const b = document.createElement('button'); b.type = 'button'; b.dataset.l = l; b.textContent = t;
@@ -1956,7 +1957,23 @@ function makeSearch(input, list, kind, onPick){
       li.addEventListener('click', ()=>choose(k));
       list.append(li);
     });
+    // Every match is reachable: the list loads 30 at a time with a button for the rest.
+    if(total > items.length){
+      const li = document.createElement('li'); li.className = 'more';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'linkbtn'; b.textContent = 'Show more ('+(total - items.length)+' more)';
+      b.addEventListener('pointerdown', e=>e.stopPropagation());
+      b.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); more(b); });
+      li.append(b); list.append(li);
+    }
     list.hidden = false; input.setAttribute('aria-expanded','true');
+  };
+  const searchUrl = (q, off)=>'/api/search?kind='+kind+'&q='+encodeURIComponent(q)+(searchLang && game==='pokemon' ? '&lang='+searchLang : '')+(off ? '&offset='+off : '');
+  const more = async (btn)=>{
+    btn.disabled = true; btn.textContent = 'Loading…';
+    try{ const r = await fetch(searchUrl(lastQ, items.length)); const data = await r.json();
+      const keep = list.scrollTop; items = items.concat(data.results || []); total = data.total || total;
+      const head = list.querySelector('li.empty'); render(head ? head.textContent : ''); list.scrollTop = keep; }
+    catch(e){ btn.disabled = false; btn.textContent = 'Couldn’t load more. Tap to retry.'; }
   };
   let lastPick = 0;
   const choose = k=>{ const it = items[k]; if(!it || Date.now()-lastPick < 600) return; lastPick = Date.now(); close(); input.value=''; items=[]; onPick(it); };
@@ -1965,10 +1982,11 @@ function makeSearch(input, list, kind, onPick){
     if(q.length < 2){ close(); return; }
     if(ctrl) ctrl.abort(); ctrl = new AbortController();
     try{
-      const r = await fetch('/api/search?kind='+kind+'&q='+encodeURIComponent(q)+(searchLang && game==='pokemon' ? '&lang='+searchLang : ''), {signal: ctrl.signal});
+      lastQ = q;
+      const r = await fetch(searchUrl(q, 0), {signal: ctrl.signal});
       const data = await r.json();
-      items = data.results || []; setBuiltAt(data.builtAt);
-      render(r.ok ? (data.note ? data.note : !items.length ? 'Nothing found. Check the spelling, or try just the name.'+(searchLang ? ' Or switch the language to All.' : '') : data.loose ? 'No exact match. Closest results:' : '') : (data.error || 'Search is unavailable right now.'));
+      items = data.results || []; total = data.total || items.length; setBuiltAt(data.builtAt);
+      render(r.ok ? (data.note ? data.note : !items.length ? 'Nothing found. Check the spelling, or try just the name.'+(searchLang ? ' Or switch the language to All.' : '') : data.loose ? 'No exact match. Closest results:' : total > 30 ? total+' matches' : '') : (data.error || 'Search is unavailable right now.'));
     }catch(e){ if(e.name!=='AbortError'){ items=[]; render('Search is unavailable right now.'); } }
   };
   input.addEventListener('input', ()=>{ clearTimeout(timer); timer = setTimeout(run, 180); });

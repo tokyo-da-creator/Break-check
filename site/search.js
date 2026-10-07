@@ -207,8 +207,8 @@ window.__noShare = true;
       score[i]=v;
     });
     hits.sort(function(a,b){ return score[b]-score[a]; });
-    var top=hits.slice(0,30);
-    return {results:top.map(function(i){ return res(c,i); }), rows:top, total:hits.length, loose:loose};
+    var off=Math.max(0, parseInt(q.get('offset'),10)||0), top=hits.slice(off, off+30);
+    return {results:top.map(function(i){ return res(c,i); }), rows:top, total:hits.length, offset:off, loose:loose};
   }
   function json(body, status){ return new Response(JSON.stringify(body), {status: status||200, headers:{'Content-Type':'application/json'}}); }
   window.fetch=function(input, init){
