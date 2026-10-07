@@ -893,7 +893,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791348506';
+(function(){ var BUILD='1791349331';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3220,34 +3220,57 @@ function drawShowcase(st){
     ctx.fillStyle = col; ctx.fillText(val, x, PY + 84);
     ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, note, cwid - 30), x, PY + 106);
   });
-  // chart
-  const gx0 = PX + 30, gx1 = PX + PW - 104, gy0 = PY + 162, gy1 = PY + 246, vb = PY + 270;
-  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText('MARKET PRICE · LAST 90 DAYS', gx0, PY + 136); spaced(ctx, 0);
+  // chart: modern price card — dot grid, glowing line, dashed 'where it started' line, price pills, no axis clutter
+  const gx0 = PX + 30, gx1 = PX + PW - 30, gy0 = PY + 172, gy1 = PY + 262, vb = PY + 284;
+  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText('PRICE HISTORY', gx0, PY + 146);
+  if(st.pts.length >= 2){ const tw0 = ctx.measureText('PRICE HISTORY').width; ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(gx0 + tw0 + 14, PY + 141, 18, 0); ctx.setLineDash && ctx.save();
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(gx0 + tw0 + 16, PY + 142); ctx.lineTo(gx0 + tw0 + 38, PY + 142); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = faint; ctx.fillText('90D AGO '+m(fromUsd(st.pts[0][1]), st.pts[0][1] >= 100 ? 0 : 2), gx0 + tw0 + 46, PY + 146); }
+  spaced(ctx, 0);
+  { // range pills, 90D active
+    const tabs = ['7D', '30D', '90D'], tw = 46, th = 24, gap = 6; let x = gx1 - (tabs.length*tw + (tabs.length-1)*gap);
+    rrect(ctx, x - 4, PY + 128, tabs.length*tw + (tabs.length-1)*gap + 8, th + 8, 16); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+    tabs.forEach(t=>{ const on = t === '90D'; if(on){ rrect(ctx, x, PY + 132, tw, th, 12); ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill(); }
+      ctx.font = '700 12px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.fillStyle = on ? INK : faint; ctx.fillText(t, x + tw/2, PY + 149); ctx.textAlign = 'left'; x += tw + gap; });
+  }
+  // dot grid
+  ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.07)';
+  for(let y = gy0 - 14; y <= gy1 + 4; y += 14) for(let x = gx0; x <= gx1; x += 14){ ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI*2); ctx.fill(); }
+  ctx.restore();
+  const pill = (txt, x, y, bg, fg, align)=>{ ctx.font = '700 15px "Barlow Semi Condensed"'; const w = ctx.measureText(txt).width + 18, h = 24;
+    let px = align === 'right' ? x - w : align === 'center' ? x - w/2 : x; px = Math.max(gx0 - 6, Math.min(gx1 + 6 - w, px));
+    rrect(ctx, px, y - h/2, w, h, 12); ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.fillText(txt, px + 9, y + 5); };
   if(st.pts.length >= 2){
-    const pts = st.pts, ys = pts.map(p=>p[1]); let lo = Math.min(...ys), hi = Math.max(...ys); const pad = (hi - lo)*0.12 || hi*0.04 || 1; lo -= pad; hi += pad;
+    const pts = st.pts, ys = pts.map(p=>p[1]); let lo = Math.min(...ys), hi = Math.max(...ys); const pad = (hi - lo)*0.08 || hi*0.04 || 1; lo -= pad; hi += pad;
     const X = i => gx0 + i/(pts.length-1)*(gx1 - gx0), Y = v => gy1 - (v - lo)/(hi - lo)*(gy1 - gy0);
-    // gridlines with price ticks
-    ctx.font = '500 12px "JetBrains Mono"'; ctx.textAlign = 'left';
-    [0, .5, 1].forEach(f=>{ const v = lo + (hi - lo)*f, y = Y(v); ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(gx0, Math.round(y), gx1 - gx0, 1); ctx.fillStyle = faint; ctx.fillText(m(fromUsd(v), v >= 100 ? 0 : 2), gx1 + 24, y + 4); });
-    // sales volume, its own little band underneath (same x, no second price axis)
-    const vmax = Math.max(1, ...pts.map(p=>p[2]||0)), bw = Math.max(2, (gx1 - gx0)/pts.length - 3);
-    pts.forEach((p,i)=>{ const h = (p[2]||0)/vmax*16; if(h < 1) return; rrect(ctx, X(i) - bw/2, vb - h, bw, h, Math.min(2, bw/2)); ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fill(); });
     const P = pts.map((p,i)=>[X(i), Y(p[1])]);
-    const line = ctx.createLinearGradient(gx0, 0, gx1, 0); line.addColorStop(0, cB); line.addColorStop(1, cA);
-    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineTo(gx1, gy1 + 2); ctx.lineTo(gx0, gy1 + 2); ctx.closePath();
-    const fill = ctx.createLinearGradient(0, gy0, 0, gy1); fill.addColorStop(0, hexA(cA, .32)); fill.addColorStop(1, hexA(cA, 0)); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
-    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = line; ctx.shadowColor = hexA(cA, .7); ctx.shadowBlur = 16; ctx.stroke(); ctx.restore();
-    // high point
-    const hiI = ys.indexOf(Math.max(...ys)), hp = P[hiI];
-    if(hiI < pts.length - 2){ ctx.beginPath(); ctx.arc(hp[0], hp[1], 4.5, 0, Math.PI*2); ctx.fillStyle = INK; ctx.fill();
-      ctx.font = '600 12px "JetBrains Mono"'; ctx.fillStyle = soft; ctx.textAlign = hp[0] > gx0 + 60 ? 'center' : 'left'; ctx.fillText('HIGH '+m(fromUsd(ys[hiI]), ys[hiI] >= 100 ? 0 : 2), hp[0], hp[1] - 12 < PY + 152 ? hp[1] + 22 : hp[1] - 12); ctx.textAlign = 'left'; }
-    // today
-    const e = P[P.length-1]; ctx.beginPath(); ctx.arc(e[0], e[1], 13, 0, Math.PI*2); ctx.fillStyle = hexA(cA, .25); ctx.fill();
-    ctx.beginPath(); ctx.arc(e[0], e[1], 6.5, 0, Math.PI*2); ctx.fillStyle = cA; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#0B0B0C'; ctx.stroke();
-    // month ticks
-    ctx.font = '500 12px "JetBrains Mono"'; ctx.fillStyle = faint; let lastM = '';
-    pts.forEach((p,i)=>{ const mo = p[0].slice(0, 7); if(mo !== lastM){ if(lastM){ const lab = new Date(p[0]+'T00:00:00Z').toLocaleDateString('en-AU', {month: 'short', timeZone: 'UTC'}).toUpperCase(); ctx.fillText(lab, X(i), vb + 17); } lastM = mo; } });
-  } else { ctx.font = '500 17px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer price history for this card yet.', gx0, gy0 + 54); }
+    // where it started, 90 days ago
+    const y0 = P[0][1];
+    ctx.save(); ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.beginPath(); ctx.moveTo(gx0, y0); ctx.lineTo(gx1, y0); ctx.stroke(); ctx.restore();
+    // area + line
+    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineTo(gx1, gy1 + 22); ctx.lineTo(gx0, gy1 + 22); ctx.closePath();
+    const fill = ctx.createLinearGradient(0, gy0, 0, gy1 + 22); fill.addColorStop(0, hexA(cA, .38)); fill.addColorStop(.7, hexA(cA, .06)); fill.addColorStop(1, hexA(cA, 0)); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 9; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = hexA(cA, .18); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = cA; ctx.shadowColor = hexA(cA, .8); ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
+    // high (if it isn't the start or the end)
+    const hiI = ys.indexOf(Math.max(...ys)), loI = ys.indexOf(Math.min(...ys));
+    const ring = (q)=>{ ctx.beginPath(); ctx.arc(q[0], q[1], 5.5, 0, Math.PI*2); ctx.fillStyle = '#0B0B0C'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke(); };
+    if(hiI > 1 && hiI < pts.length - 2){ ring(P[hiI]); pill('HIGH '+m(fromUsd(ys[hiI]), ys[hiI] >= 100 ? 0 : 2), P[hiI][0], P[hiI][1] - 20 < gy0 ? P[hiI][1] + 22 : P[hiI][1] - 20, 'rgba(255,255,255,.14)', INK, 'center'); }
+    if(loI > 1 && loI < pts.length - 2 && Math.abs(loI - hiI) > 3){ ring(P[loI]); pill('LOW '+m(fromUsd(ys[loI]), ys[loI] >= 100 ? 0 : 2), P[loI][0], P[loI][1] + 22, 'rgba(255,255,255,.14)', INK, 'center'); }
+    // today: halo dot + price pill in the card's colour
+    const e = P[P.length-1], nowV = st.market!=null ? st.market : ys[ys.length-1];
+    ctx.beginPath(); ctx.arc(e[0], e[1], 16, 0, Math.PI*2); ctx.fillStyle = hexA(cA, .16); ctx.fill();
+    ctx.beginPath(); ctx.arc(e[0], e[1], 9, 0, Math.PI*2); ctx.fillStyle = hexA(cA, .35); ctx.fill();
+    ctx.beginPath(); ctx.arc(e[0], e[1], 5, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+    pill('NOW '+m(fromUsd(nowV), nowV >= 100 ? 0 : 2), e[0] - 22, e[1] < gy0 + 24 ? e[1] + 26 : e[1] - 26, cA, '#0B0B0C', 'right');
+    // sales activity: slim capsules
+    const vmax = Math.max(1, ...pts.map(p=>p[2]||0)), step = (gx1 - gx0)/Math.max(1, pts.length - 1);
+    pts.forEach((p,i)=>{ const h = Math.max(2, (p[2]||0)/vmax*14); rrect(ctx, X(i) - 2, vb - h, 4, h, 2); ctx.fillStyle = (p[2]||0) ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.07)'; ctx.fill(); });
+    // months
+    ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; let lastM = '';
+    pts.forEach((p,i)=>{ const mo = p[0].slice(0, 7); if(mo !== lastM){ if(lastM && X(i) < gx1 - 80 && X(i) > gx0 + 20){ const lab = new Date(p[0]+'T00:00:00Z').toLocaleDateString('en-AU', {month: 'short', timeZone: 'UTC'}).toUpperCase(); ctx.textAlign = 'center'; ctx.fillText(lab, X(i), vb + 18); ctx.textAlign = 'left'; } lastM = mo; } });
+    ctx.textAlign = 'right'; ctx.fillText('TODAY', gx1, vb + 18); ctx.textAlign = 'left'; spaced(ctx, 0);
+  } else { ctx.font = '500 17px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer price history for this card yet.', gx0, gy0 + 40); }
   // recent sales chips
   if(st.sales.length){
     const k = Math.min(4, st.sales.length), sy = PY + PH - 58, gap = 10, sw = (PW - 48 - gap*(k-1))/k;
