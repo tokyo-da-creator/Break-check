@@ -3318,8 +3318,9 @@ $('zoom').addEventListener('click', ()=>{ $('zoom').hidden = true; });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') $('zoom').hidden = true; });
 paintGame();
 // Prices stay current while the page is open: every 5 minutes, and whenever you come back to the tab.
-setInterval(()=>{ if(!document.hidden) refreshPrices(); }, 5*60*1000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshPrices(); });
+function refreshAll(){ refreshPrices(); loadFeatured(); repriceHistory(); }
+setInterval(()=>{ if(!document.hidden) refreshAll(); }, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshAll(); });
 loadFx().then(()=>{ loadFeatured(); refreshPrices(); renderHistory(); repriceHistory(); });
 // Keep prices live while the page is open.
 setInterval(refreshPrices, 10*60*1000);

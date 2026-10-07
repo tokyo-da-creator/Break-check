@@ -110,14 +110,36 @@ async function livePoints(id, ctx) {
   ctx.waitUntil(cache.put(key, new Response(JSON.stringify(pts), { headers: { "Cache-Control": `public, max-age=${LIVE_TTL}` } })));
   return pts;
 }
+// Cards sold in two printings TCGplayer's price points can't tell apart (Holo vs Reverse, 1st Edition vs Unlimited):
+// read each printing's current near-mint market price from TCGplayer's price history instead.
+async function liveVariants(id, ctx) {
+  const cache = caches.default, key = new Request(`https://cache.breakcheck/livev/${id}`);
+  const hit = await cache.match(key); if (hit) return hit.json();
+  const r = await fetch(`https://infinite-api.tcgplayer.com/price/history/${id}/detailed?range=month`, {
+    headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; BreakCheck/1.0)", "Origin": "https://www.tcgplayer.com", "Referer": "https://www.tcgplayer.com/" } });
+  if (!r.ok) throw new Error(`tcgplayer ${r.status}`);
+  const d = await r.json(), out = {};
+  for (const x of d?.result || []) {
+    if (!/near mint|unopened/i.test(x.condition || "")) continue;
+    const b = (x.buckets || [])[0], m = Number(b?.marketPrice);   // newest bucket first
+    if (isFinite(m) && m > 0 && out[x.variant] == null) out[x.variant] = Math.round(m * 100) / 100;
+  }
+  ctx.waitUntil(cache.put(key, new Response(JSON.stringify(out), { headers: { "Cache-Control": `public, max-age=${LIVE_TTL}` } })));
+  return out;
+}
 async function live(url, ctx) {
   const want = (url.searchParams.get("ids") || "").split(",")
-    .map((s) => s.match(/^(\d{1,9}):([NF])$/)).filter(Boolean).slice(0, 40);
-  const ids = [...new Set(want.map((m) => m[1]))];
-  const got = {};
-  await Promise.all(ids.map(async (id) => { try { got[id] = await livePoints(id, ctx); } catch {} }));
+    .map((s) => s.match(/^(\d{1,9}):([NFV])$/)).filter(Boolean).slice(0, 40);
+  const ids = [...new Set(want.filter((m) => m[2] !== "V").map((m) => m[1]))];
+  const vids = [...new Set(want.filter((m) => m[2] === "V").map((m) => m[1]))].slice(0, 15);
+  const got = {}, gotV = {};
+  await Promise.all([
+    ...ids.map(async (id) => { try { got[id] = await livePoints(id, ctx); } catch {} }),
+    ...vids.map(async (id) => { try { gotV[id] = await liveVariants(id, ctx); } catch {} }),
+  ]);
   const prices = {};
-  for (const m of want) { const v = got[m[1]]?.[m[2]]; if (v != null) prices[`${m[1]}:${m[2]}`] = v; }
+  for (const m of want) { if (m[2] === "V") continue; const v = got[m[1]]?.[m[2]]; if (v != null) prices[`${m[1]}:${m[2]}`] = v; }
+  for (const id of vids) for (const [variant, v] of Object.entries(gotV[id] || {})) prices[`${id}:V:${variant}`] = v;
   return json({ prices, at: new Date().toISOString() }, 200, { "Cache-Control": "no-store" });
 }
 

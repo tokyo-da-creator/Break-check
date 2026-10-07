@@ -62,8 +62,11 @@ window.__noShare = true;
   function printing(c, e){
     var vs=c.vars[e[0]]||[], v=e[4];
     if(vs.length===1) return e[8]==='s' ? 'N' : (/holo|reverse/i.test(v) ? 'F' : 'N') + '*';
-    if(vs.length===2 && vs.indexOf('')>=0 && (vs.indexOf('Reverse')>=0 || vs.indexOf('Holo')>=0)) return v==='' ? 'N' : 'F';
-    return null;
+    if(vs.length===2 && vs.indexOf('')>=0 && (vs.indexOf('Reverse')>=0 || vs.indexOf('Holo')>=0 || vs.indexOf('Foil')>=0)) return v==='' ? 'N' : 'F';
+    return 'V';   // two printings of the same kind: look up this printing by name
+  }
+  // TCGplayer's full printing name for a catalog variant ('' Normal, Holo Holofoil, Reverse Reverse Holofoil...)
+  function vFull(v){ return !v ? 'Normal' : v==='Holo' ? 'Holofoil' : v==='Reverse' ? 'Reverse Holofoil' : v.replace(/\bHolo\b/, 'Holofoil');
   }
   // Swap in TCGplayer's live Market Price (what tcgplayer.com shows right now). Falls back to the daily price.
   // Chinese singles: completed-sale price from CardOS, only for items actually picked (each lookup costs a credit).
@@ -87,7 +90,7 @@ window.__noShare = true;
       if(c.sets[c.items[i][7]][2]===2){ hint[k]=null; return; }
       var h=printing(c, c.items[i]); hint[k]=h; if(!h) return;
       var id=c.items[i][0];
-      if(h.slice(-1)==='*'){ ask.push(id+':N', id+':F'); } else ask.push(id+':'+h);
+      if(h.slice(-1)==='*'){ ask.push(id+':N', id+':F'); } else if(h==='V'){ if(ask.indexOf(id+':V')<0) ask.push(id+':V'); } else ask.push(id+':'+h);
     });
     if(!ask.length) return Promise.resolve(out);
     var ctl=new AbortController(), t=setTimeout(function(){ ctl.abort(); }, 3000);
@@ -96,6 +99,7 @@ window.__noShare = true;
       rows.forEach(function(i,k){
         var h=hint[k]; if(!h) return; var id=c.items[i][0], v;
         if(h.slice(-1)==='*'){ var pref=h[0], other=pref==='N'?'F':'N'; v=P[id+':'+pref]!=null?P[id+':'+pref]:P[id+':'+other]; }
+        else if(h==='V') v=P[id+':V:'+vFull(c.items[i][4])];
         else v=P[id+':'+h];
         if(v!=null){ out[k].market=v; out[k].best=v; out[k].basis='live'; window.__liveOK=true; }
       });
