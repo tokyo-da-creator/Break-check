@@ -162,13 +162,14 @@ async function cardData(url, ctx) {
   const id = url.searchParams.get("id") || "";
   if (!/^\d{1,9}$/.test(id)) return json({ error: "Bad id." }, 400);
   const range = ({ month: "month", quarter: "quarter", annual: "annual" })[url.searchParams.get("r")] || "quarter";
-  const cache = caches.default, key = new Request(`https://cache.breakcheck/card3/${id}/${range}`);
+  const noSales = url.searchParams.get("sales") === "0";
+  const cache = caches.default, key = new Request(`https://cache.breakcheck/card3/${id}/${range}${noSales ? "/h" : ""}`);
   const hit = await cache.match(key); if (hit) return hit;
   const H = { "Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; BreakCheck/1.0)", "Origin": "https://www.tcgplayer.com", "Referer": "https://www.tcgplayer.com/" };
   const num = (v) => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
   const [h, sl] = await Promise.all([
     fetch(`https://infinite-api.tcgplayer.com/price/history/${id}/detailed?range=${range}`, { headers: H }).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetch(`https://mpapi.tcgplayer.com/v2/product/${id}/latestsales`, { method: "POST", headers: { ...H, "Content-Type": "application/json" },
+    noSales ? Promise.resolve(null) : fetch(`https://mpapi.tcgplayer.com/v2/product/${id}/latestsales`, { method: "POST", headers: { ...H, "Content-Type": "application/json" },
       body: JSON.stringify({ conditions: [], languages: [], variants: [], listingType: "All", limit: 25 }) }).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
   const series = (h?.result || []).map((x) => ({
@@ -182,8 +183,8 @@ async function cardData(url, ctx) {
     d: String(x.orderDate || "").slice(0, 10), p: num(x.purchasePrice), ship: num(x.shippingPrice) || 0, q: Number(x.quantity) || 1,
     cond: x.condition || "", variant: x.variant || "", language: x.language || "", photos: x.listingType === "ListingWithPhotos",
   })).filter((x) => x.p != null && x.d);
-  const res = json({ id: Number(id), range, series, sales, at: new Date().toISOString(), ok: !!(h || sl) }, 200, { "Cache-Control": "public, max-age=900" });
-  if (h || sl) ctx.waitUntil(cache.put(key, new Response(res.clone().body, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" } })));
+  const res = json({ id: Number(id), range, series, sales, at: new Date().toISOString(), ok: !!h }, 200, { "Cache-Control": "public, max-age=900" });
+  if (h) ctx.waitUntil(cache.put(key, new Response(res.clone().body, { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" } })));
   return res;
 }
 

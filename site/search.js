@@ -136,6 +136,22 @@ window.__noShare = true;
       }
       return {results: pick>=0 ? [res(c,pick)] : [], rows: pick>=0 ? [pick] : []};
     }
+    // Top lists: sets to choose from
+    if(q.get('sets')!=null){
+      var sq=(q.get('sets')||'').toLowerCase().trim(), sl=({en:0,jp:1,cn:2})[q.get('lang')], out=[];
+      c.sets.forEach(function(st,si){ if(sl!=null && st[2]!==sl) return; if(NOT_A_SET.test(st[0])) return;
+        if(sq && (st[0]+' '+setAlias(st[0])).toLowerCase().indexOf(sq)<0) return; out.push(si); });
+      out.sort(function(a,b){ return (c.sets[b][1]||'').localeCompare(c.sets[a][1]||''); });
+      return {sets: out.slice(0, 40).map(function(si){ var st=c.sets[si]; return {i:si, name:st[0], date:st[1], lang:st[2]===1?'jp':st[2]===2?'cn':'en'}; }), results:[]};
+    }
+    // Top lists: the most valuable singles in one set
+    if(q.get('settop')!=null){
+      var si2=Number(q.get('settop')), n2=Math.min(30, Number(q.get('n'))||20), rowsT=[];
+      for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(best(e[5],e[6])==null) continue; rowsT.push(i); }
+      rowsT.sort(function(a,b){ return best(c.items[b][5],c.items[b][6]) - best(c.items[a][5],c.items[a][6]); });
+      rowsT=rowsT.slice(0, n2+10);
+      return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT};
+    }
     if(q.get('featured')){
       var today=new Date().toISOString().slice(0,10);
       var order=c.sets.map(function(s,si){ return {s:s, si:si}; })
@@ -210,6 +226,28 @@ window.__noShare = true;
     var off=Math.max(0, parseInt(q.get('offset'),10)||0), top=hits.slice(off, off+30);
     return {results:top.map(function(i){ return res(c,i); }), rows:top, total:hits.length, offset:off, loose:loose};
   }
+  var movP=null;
+  function movers(){ return movP || (movP = realFetch('movers.json').then(function(r){ if(!r.ok) throw 0; return r.json(); })); }
+  function moverList(c, m, q){
+    var kind=q.get('movers'), per=q.get('period')==='month' ? 'month' : 'week', n=Math.min(30, Number(q.get('n'))||20), lang=({en:0,jp:1})[q.get('lang')];
+    var at={}; c.items.forEach(function(e,i){ at[e[0]+'|'+e[4]]=i; });
+    var list=[];
+    (m.rows||[]).forEach(function(r){
+      var i=at[r[0]+'|'+r[1]]; if(i==null) return; var e=c.items[i];
+      if(lang!=null && c.sets[e[7]][2]!==lang) return;
+      var then = per==='week' ? r[3] : r[4], sold = per==='week' ? r[5] : r[6];
+      if(!then || !r[2]) return;
+      if(kind!=='sold' && sold < (per==='week' ? 4 : 8)) return;
+      var ch = r[2]/then - 1;
+      list.push({i:i, ch:ch, then:then, now:r[2], sold:sold});
+    });
+    if(kind==='gain') list = list.filter(function(x){ return x.ch > 0.02; }).sort(function(a,b){ return b.ch-a.ch; });
+    else if(kind==='drop') list = list.filter(function(x){ return x.ch < -0.02; }).sort(function(a,b){ return a.ch-b.ch; });
+    else list.sort(function(a,b){ return b.sold-a.sold || b.now-a.now; });
+    // one entry per card (not every printing)
+    var seen={}; list = list.filter(function(x){ var k=c.items[x.i][0]; if(seen[k]) return false; seen[k]=1; return true; }).slice(0, n);
+    return {results: list.map(function(x){ var o=res(c,x.i); o.then=x.then; o.histNow=x.now; o.sold=x.sold; o.change=x.ch; o.setDate=c.sets[c.items[x.i][7]][1]; return o; }), rows: list.map(function(x){ return x.i; }), moversAt: m.builtAt};
+  }
   function json(body, status){ return new Response(JSON.stringify(body), {status: status||200, headers:{'Content-Type':'application/json'}}); }
   window.fetch=function(input, init){
     var url = typeof input==='string' ? input : input.url;
@@ -225,11 +263,17 @@ window.__noShare = true;
           return Promise.all(jobs).then(function(){ return json(b); });
         }, function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
       }
+      if(U.searchParams.get('movers')){
+        return Promise.all([cat(), movers()]).then(function(a){
+          var c=a[0], b=moverList(c, a[1], U.searchParams); b.builtAt=c.builtAt; var rows=b.rows; delete b.rows;
+          return withLive(c, rows, b.results).then(function(){ return json(b); });
+        }, function(){ return json({error:'Top lists are being prepared. Check back soon.', results:[]}, 503); });
+      }
       return cat().then(function(c){
           var b=search(c, U); b.builtAt=c.builtAt;
           var rows=b.rows||[]; delete b.rows;
           // Live prices for the first 15 results (the ones you can see); the rest update when picked.
-          var picked = /[?&]ids=/.test(url), n = picked ? 40 : 15;
+          var picked = /[?&]ids=/.test(url), n = picked || /[?&]settop=/.test(url) ? 40 : 15;
           return withLive(c, rows.slice(0,n), b.results.slice(0,n)).then(function(){ return withCN(c, rows.slice(0,n), b.results.slice(0,n), picked); }).then(function(){ return json(b); });
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });

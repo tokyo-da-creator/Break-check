@@ -70,7 +70,7 @@ header{display:flex;flex-direction:column;gap:4px}
 .games button[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--ink)}
 .games button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 body.op .langs{display:none}
-.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px}
 .tabs button{font:600 15px var(--body);color:var(--muted);background:transparent;border:0;border-radius:8px;min-height:44px;cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--fg);color:var(--ink)}
 .panel{display:flex;flex-direction:column;gap:24px}
@@ -295,7 +295,7 @@ header.top .tabs{margin-top:18px}
   header.top .kicker{display:none}
   header.top .mascot{--m:48px}
   header.top .mark{font-size:28px}
-  header.top .tabs{margin:0;justify-self:center;width:100%;max-width:440px;grid-column:3;grid-row:1}
+  header.top .tabs{grid-template-columns:repeat(4,1fr);margin:0;justify-self:center;width:100%;max-width:560px;grid-column:3;grid-row:1}
   header.top .brand{grid-column:1;grid-row:1}
   header.top .games{margin:0;grid-column:2;grid-row:1}
   header.top .games button{flex:none;min-height:34px;font-size:13px}
@@ -327,6 +327,17 @@ header.top .tabs{margin-top:18px}
   .btn:hover{border-color:color-mix(in srgb,var(--fg) 40%,var(--line))}
 }
 .results li.more{display:flex;justify-content:center;padding:12px;border-bottom:0}
+/* top lists */
+.toplists .chip[aria-pressed="true"]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
+.toprows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.toprows li{display:grid;grid-template-columns:34px 44px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.toprows .rk{font:400 22px Anton,var(--body);color:var(--muted);text-align:center}
+.toprows li:nth-child(1) .rk{color:#F5C84C}.toprows li:nth-child(2) .rk{color:#D8DCE3}.toprows li:nth-child(3) .rk{color:#E09A62}
+.toprows .nm{font:700 14px var(--body);color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toprows .sub{font:500 12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toprows .pr{text-align:right;font:700 16px var(--mono);color:var(--fg)}
+.toprows .ch{display:block;font:700 12px var(--mono)}
+#topSets li{cursor:pointer}
 /* show a card */
 .row-photo{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .row-photo .btn.sm{min-height:40px;padding:0 16px;flex:none}
@@ -401,6 +412,7 @@ header.top .tabs{margin-top:18px}
       <button id="tab-check" role="tab" aria-selected="true" aria-controls="panel-check">Check a price</button>
       <button id="tab-log" role="tab" aria-selected="false" aria-controls="panel-log">Log my pulls</button>
       <button id="tab-show" role="tab" aria-selected="false" aria-controls="panel-show">Show a card</button>
+      <button id="tab-top" role="tab" aria-selected="false" aria-controls="panel-top">Top lists</button>
     </div>
   </header>
   <div class="lede"><h1>Know what it’s worth before you buy.</h1><div class="live lede-live"><i aria-hidden="true"></i><span id="priceAge2">Live TCGplayer prices</span></div><p id="ledeText">Live market prices for every English and Japanese card, box, ETB and pack, plus Chinese singles.</p></div>
@@ -578,6 +590,53 @@ header.top .tabs{margin-top:18px}
       <div class="empty-state" id="histEmpty">Save a break and it shows up here, with your all-time profit or loss.</div>
       <div class="hint">Saved on this device. Values update to today’s TCGplayer prices.</div>
     </section>
+  </section>
+
+  <!-- TOP LISTS -->
+  <section class="panel" id="panel-top" role="tabpanel" aria-labelledby="tab-top" hidden>
+   <div class="col-in">
+    <div class="step">
+      <div class="stephead"><span class="num">1</span>Which list?</div>
+      <div class="chips toplists" id="topKinds" role="group" aria-label="List">
+        <button class="chip" type="button" data-k="set">Top cards in a set</button>
+        <button class="chip" type="button" data-k="gain">Biggest gainers</button>
+        <button class="chip" type="button" data-k="drop">Biggest drops</button>
+        <button class="chip" type="button" data-k="sold">Most sold</button>
+      </div>
+    </div>
+    <div class="step" id="topSetStep">
+      <div class="stephead"><span class="num">2</span><label for="topSetSearch">Which set?</label></div>
+      <input id="topSetSearch" class="search" type="search" autocomplete="off" placeholder="Search a set, e.g. phantasmal flames">
+      <ul class="results" id="topSets" hidden></ul>
+      <div class="chosen" id="topSetChosen" hidden><div><div class="nm" id="topSetName"></div><div class="sub" id="topSetSub"></div></div><button class="linkbtn" id="topSetClear" type="button">Change</button></div>
+    </div>
+    <div class="step" id="topPerStep" hidden>
+      <div class="stephead"><span class="num">2</span>Over what time?</div>
+      <div class="seg" role="group" aria-label="Period"><button id="per-week" type="button" aria-pressed="true">This week</button><button id="per-month" type="button" aria-pressed="false">This month</button></div>
+      <div class="seg slim" id="topLang" role="group" aria-label="Language" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-l="" aria-pressed="true">All</button><button type="button" data-l="en" aria-pressed="false">English</button><button type="button" data-l="jp" aria-pressed="false">Japanese</button></div>
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">3</span>How many?</div>
+      <div class="seg" role="group" aria-label="How many"><button id="cnt-10" type="button" aria-pressed="false">Top 10</button><button id="cnt-20" type="button" aria-pressed="true">Top 20</button></div>
+    </div>
+   </div>
+   <div class="col-out">
+    <div class="result" aria-live="polite">
+      <div class="stephead"><span class="num">4</span><span id="topHead">Your list</span></div>
+      <div class="empty-state" id="topEmpty">Pick a list. Prices are today’s TCGplayer near-mint market prices.</div>
+      <div id="topOut" style="display:flex;flex-direction:column;gap:12px" hidden>
+        <ol class="toprows" id="topRows"></ol>
+        <div class="hint" id="topNote"></div>
+        <div class="creator" data-creator></div>
+        <div class="btns"><button class="btn primary" id="saveTop">Save image</button><button class="btn" id="copyTop">Copy caption</button></div>
+      </div>
+      <div class="status" id="statusTop"></div>
+    </div>
+    <div class="preview" id="topPreview" hidden>
+      <div class="eyebrow">Top list<span class="touch-only"> · press and hold to save</span></div>
+      <div class="holo" id="topHolo"><img id="topImg" alt="Top list share image"></div>
+    </div>
+   </div>
   </section>
 
   <!-- SHOW A CARD -->
@@ -900,7 +959,7 @@ function productArt(id, sealed){
     const src = e.img;
     src.onload = ()=>{
       if(sealed){ try{ e.img = trimToProduct(src); }catch(err){} }
-      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow();
+      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon();
     };
     if(sealed) src.src = imgSrc(id, true); else cardTrim(id, true).then(u=>{ src.src = u; }).catch(()=>{});
   }
@@ -2167,6 +2226,7 @@ function setGame(g){
   ['prodSearch','hitSearch','sealedSearch'].forEach(id=>{ $(id).value=''; $(id).dispatchEvent(new Event('search')); });
   $('featured').textContent=''; $('featuredLabel').hidden = true;
   paintGame(); loadFeatured();
+  if(!$('panel-top').hidden) openTop();
 }
 Object.keys(GAMES).forEach(g=>$('game-'+g).addEventListener('click', ()=>setGame(g)));
 document.querySelector('.mascot').addEventListener('click', e=>replay(e.currentTarget, 'hop'));
@@ -3012,6 +3072,163 @@ $('copyShow').addEventListener('click', ()=>{
 });
 updateShow();
 
+// ---------- top lists: most valuable in a set, biggest gainers / drops, most sold ----------
+let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: ''}, store.get('top1') || {});
+let topItems = [], topMeta = null, tTop;
+const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold'};
+function saveTop(){ store.set('top1', top); }
+function paintTopUI(){
+  document.querySelectorAll('#topKinds .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.k===top.kind));
+  const isSet = top.kind === 'set';
+  $('topSetStep').hidden = !isSet; $('topPerStep').hidden = isSet;
+  $('topSetChosen').hidden = !(isSet && top.set); $('topSetSearch').hidden = !!(isSet && top.set);
+  if(top.set){ $('topSetName').textContent = top.set.name; $('topSetSub').textContent = [top.set.date ? top.set.date.slice(0, 4) : '', LANGN[top.set.lang]].filter(Boolean).join(' · '); }
+  $('per-week').setAttribute('aria-pressed', top.period==='week'); $('per-month').setAttribute('aria-pressed', top.period==='month');
+  $('cnt-10').setAttribute('aria-pressed', top.n===10); $('cnt-20').setAttribute('aria-pressed', top.n===20);
+  document.querySelectorAll('#topLang button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l===top.lang));
+}
+document.querySelectorAll('#topKinds .chip').forEach(b=>b.addEventListener('click', ()=>{ top.kind = b.dataset.k; saveTop(); openTop(); }));
+$('per-week').addEventListener('click', ()=>{ top.period = 'week'; saveTop(); openTop(); });
+$('per-month').addEventListener('click', ()=>{ top.period = 'month'; saveTop(); openTop(); });
+$('cnt-10').addEventListener('click', ()=>{ top.n = 10; saveTop(); openTop(); });
+$('cnt-20').addEventListener('click', ()=>{ top.n = 20; saveTop(); openTop(); });
+document.querySelectorAll('#topLang button').forEach(b=>b.addEventListener('click', ()=>{ top.lang = b.dataset.l; saveTop(); openTop(); }));
+$('topSetClear').addEventListener('click', ()=>{ top.set = null; saveTop(); paintTopUI(); topItems = []; renderTop(); findSets(); $('topSetSearch').focus(); });
+let tSets;
+$('topSetSearch').addEventListener('input', ()=>{ clearTimeout(tSets); tSets = setTimeout(findSets, 160); });
+$('topSetSearch').addEventListener('focus', ()=>{ if($('topSets').hidden) findSets(); });
+async function findSets(){
+  const q = $('topSetSearch').value.trim();
+  try{
+    const r = await fetch('/api/search?sets='+encodeURIComponent(q)); const d = await r.json(); const ul = $('topSets'); ul.textContent = '';
+    (d.sets||[]).slice(0, 25).forEach(st=>{ const li = document.createElement('li'); li.setAttribute('role', 'option');
+      const mid = document.createElement('div'); const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = st.name;
+      const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [st.date ? st.date.slice(0, 7) : '', LANGN[st.lang]].filter(Boolean).join(' · '); mid.append(nm, sb); li.append(mid);
+      li.addEventListener('click', ()=>{ top.set = {i: st.i, name: st.name, date: st.date, lang: st.lang, game}; saveTop(); ul.hidden = true; $('topSetSearch').value = ''; openTop(); });
+      ul.append(li); });
+    ul.hidden = !ul.children.length;
+  }catch(e){}
+}
+async function openTop(){
+  paintTopUI();
+  if(top.kind === 'set' && (!top.set || top.set.game !== game)){ top.set = null; paintTopUI(); topItems = []; renderTop(); findSets(); return; }
+  $('topEmpty').hidden = false; $('topEmpty').textContent = 'Getting today’s prices…'; $('topOut').hidden = true; $('topPreview').hidden = true;
+  const want = top.n, url = top.kind === 'set' ? '/api/search?settop='+top.set.i+'&n='+want
+    : '/api/search?movers='+top.kind+'&period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '');
+  try{
+    const r = await fetch(url), d = await r.json();
+    if(!r.ok) throw new Error(d.error || 'bad');
+    let items = (d.results||[]).filter(x=>x.best!=null);
+    if(top.kind === 'set') items.sort((a,b)=>b.best - a.best);
+    else {
+      // re-measure against today's live price
+      items.forEach(x=>{ if(x.then) x.change = x.best/x.then - 1; });
+      if(top.kind === 'gain') items = items.filter(x=>x.change > 0).sort((a,b)=>b.change - a.change);
+      if(top.kind === 'drop') items = items.filter(x=>x.change < 0).sort((a,b)=>a.change - b.change);
+    }
+    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt};
+    renderTop();
+  }catch(e){ topItems = []; $('topEmpty').textContent = e.message && e.message !== 'bad' ? e.message : 'Couldn’t load this list. Try again in a moment.'; $('topOut').hidden = true; $('topPreview').hidden = true; }
+}
+function topTitle(){
+  const per = top.period === 'month' ? 'This month' : 'This week';
+  return top.kind === 'set' ? {big: 'TOP '+topItems.length, line: 'MOST VALUABLE · '+(top.set ? shortSet(top.set.name).toUpperCase() : ''), sub: top.set && top.set.lang === 'jp' ? 'Japanese set' : ''}
+    : {big: 'TOP '+topItems.length, line: KINDS[top.kind].toUpperCase()+' · '+per.toUpperCase(), sub: top.lang ? LANGN[top.lang]+' cards' : 'English & Japanese'};
+}
+function renderTop(){
+  const has = topItems.length > 0;
+  $('topOut').hidden = !has; $('topPreview').hidden = !has;
+  if(!has){ if(!$('topEmpty').textContent || top.kind==='set') $('topEmpty').textContent = top.kind==='set' && !top.set ? 'Pick a set. You’ll get its most valuable cards at today’s TCGplayer prices.' : 'Nothing to show for this list yet.'; $('topEmpty').hidden = false; return; }
+  $('topEmpty').hidden = true;
+  const T = topTitle(); $('topHead').textContent = T.big.charAt(0)+T.big.slice(1).toLowerCase()+' · '+T.line.charAt(0)+T.line.slice(1).toLowerCase();
+  const ol = $('topRows'); ol.textContent = '';
+  topItems.forEach((x, k)=>{
+    const li = document.createElement('li');
+    const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = k+1;
+    const mid = document.createElement('div'); mid.style.minWidth = '0';
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name + (x.number ? ' '+x.number : '');
+    const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : ''].filter(Boolean).join(' · ');
+    mid.append(nm, sb);
+    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(x.best));
+    if(top.kind !== 'set'){ const ch = document.createElement('span'); ch.className = 'ch';
+      ch.textContent = top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
+    li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
+  });
+  $('topNote').textContent = top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
+    : 'Change from TCGplayer’s near-mint market price '+(top.period === 'month' ? '30' : '7')+' days ago to today. Cards worth $20+ with at least '+(top.period === 'month' ? 8 : 4)+' sales in that time'+(topMeta && topMeta.at ? '. History updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}) : '')+'.';
+  topItems.forEach(x=>productArt(x.id, false));
+  drawTopSoon();
+}
+function drawTopSoon(){ clearTimeout(tTop); tTop = setTimeout(()=>{ const cv = drawTopList(); if(cv) $('topImg').src = cv.toDataURL('image/jpeg', 0.9); }, 200); }
+function drawTopList(){
+  if(!topItems.length || !bcFonts()) return null;
+  const n = topItems.length, cols = 5, rows = Math.ceil(n/cols), W = 1200, gx = 40, gap = 14, tw = (W - gx*2 - gap*(cols-1))/cols, ch = tw*1.395, ph = 50, rh = ch + ph + 18;
+  const H0 = 236, H = Math.round(H0 + rows*rh + 64), cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), INK = '#F4F1EA', soft = 'rgba(242,239,232,.62)', faint = 'rgba(242,239,232,.4)', rnd = bcRand(n*31 + 7);
+  const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : ['#C8F23C'];
+  ctx.fillStyle = '#07070A'; ctx.fillRect(0, 0, W, H);
+  if(lead){ const im = lead.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(W/iw, H/ih)*1.2; ctx.drawImage(softBackdrop(im, topItems[0].id), (W - iw*k)/2, (H - ih*k)/2, iw*k, ih*k); }
+  const fade = ctx.createLinearGradient(0, 0, 0, H); fade.addColorStop(0, 'rgba(7,7,10,.45)'); fade.addColorStop(.25, 'rgba(7,7,10,.72)'); fade.addColorStop(1, 'rgba(7,7,10,.9)'); ctx.fillStyle = fade; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.globalAlpha = .045; ctx.strokeStyle = '#fff'; for(let x=-H; x<W; x+=24){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H*0.6, H); ctx.stroke(); } ctx.restore();
+  // header
+  ctx.textBaseline = 'alphabetic';
+  if(brandIcon.complete && brandIcon.naturalWidth) ctx.drawImage(brandIcon, gx, 30, 52, 52);
+  ctx.font = '400 30px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', gx + 62, 66); spaced(ctx, 0);
+  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = cA; ctx.fillText('TOP LIST · '+today, gx + 64, 84); spaced(ctx, 0);
+  if(creatorOn()) drawCreator(ctx, W - gx, 32, 48, {align: 'right', font: '700 24px Archivo', ring: cA});
+  const T = topTitle();
+  ctx.textAlign = 'center';
+  ctx.font = '400 92px Anton'; spaced(ctx, 4); const g = ctx.createLinearGradient(0, 100, 0, 190); g.addColorStop(0, '#FFFFFF'); g.addColorStop(1, '#D9D4C8'); ctx.fillStyle = g;
+  ctx.shadowColor = hexA(cA, .45); ctx.shadowBlur = 30; ctx.fillText(T.big, W/2, 176); ctx.shadowBlur = 0; spaced(ctx, 0);
+  let fs = 30; ctx.font = '800 '+fs+'px Archivo'; while(ctx.measureText(T.line).width > W - 120 && fs > 18){ fs -= 1; ctx.font = '800 '+fs+'px Archivo'; }
+  ctx.fillStyle = cA; ctx.fillText(T.line, W/2, 214);
+  ctx.textAlign = 'left';
+  // tiles
+  const RING = ['#F5C84C', '#D8DCE3', '#E09A62'];
+  topItems.forEach((x, k)=>{
+    const c = k % cols, r = Math.floor(k / cols);
+    // centre a short last row
+    const inRow = r === rows - 1 ? n - r*cols : cols, off = (cols - inRow)*(tw + gap)/2;
+    const X = gx + off + c*(tw + gap), Y = H0 + r*rh;
+    // price
+    ctx.textAlign = 'center'; let pf = 34; const pv = money(fromUsd(x.best), x.best >= 1000 ? 0 : 2); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 8 && pf > 20){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
+    ctx.fillStyle = INK; ctx.fillText(pv, X + tw/2, Y + 36); ctx.textAlign = 'left';
+    const cy = Y + ph, a = productArt(x.id, false), ring = RING[k];
+    ctx.save(); if(ring){ ctx.shadowColor = hexA(ring, .7); ctx.shadowBlur = 28; } else { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; }
+    rrect(ctx, X, cy, tw, ch, 10); ctx.fillStyle = '#111'; ctx.fill(); ctx.restore();
+    if(a){ ctx.save(); rrect(ctx, X, cy, tw, ch, 10); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, kk = Math.max(tw/iw, ch/ih); ctx.drawImage(im, X + (tw - iw*kk)/2, cy + (ch - ih*kk)/2, iw*kk, ih*kk); ctx.restore(); }
+    rrect(ctx, X, cy, tw, ch, 10); ctx.lineWidth = ring ? 4 : 1.5; ctx.strokeStyle = ring || 'rgba(255,255,255,.22)'; ctx.stroke();
+    // rank badge
+    ctx.font = '400 30px Anton'; const rt = '#'+(k+1), rw = ctx.measureText(rt).width + 22;
+    rrect(ctx, X + tw - rw - 6, cy + ch - 46, rw, 40, 8); ctx.fillStyle = ring || '#0B0B0C'; ctx.fill();
+    ctx.fillStyle = ring ? '#0B0B0C' : INK; ctx.textAlign = 'center'; ctx.fillText(rt, X + tw - rw/2 - 6, cy + ch - 15); ctx.textAlign = 'left';
+    // change chip
+    if(top.kind !== 'set'){
+      const t = top.kind === 'sold' ? x.sold+' SOLD' : (x.change >= 0 ? '▲' : '▼')+Math.abs(x.change*100).toFixed(x.change*100 >= 100 ? 0 : 1)+'%';
+      const col = top.kind === 'sold' ? '#F4F1EA' : x.change >= 0 ? '#3BE38A' : '#FF5A4E';
+      ctx.font = '800 18px "Barlow Semi Condensed"'; const cw = ctx.measureText(t).width + 18;
+      rrect(ctx, X + 6, cy + 6, cw, 28, 14); ctx.fillStyle = 'rgba(7,7,10,.82)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(col, .7); ctx.stroke();
+      ctx.fillStyle = col; ctx.fillText(t, X + 15, cy + 26);
+    }
+  });
+  // footer
+  ctx.font = '600 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
+  const foot = top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
+  ctx.fillText(foot, gx, H - 26); ctx.textAlign = 'right'; ctx.fillText('POKESNIPR.COM', W - gx, H - 26); ctx.textAlign = 'left'; spaced(ctx, 0);
+  grainVignette(ctx, rnd, .02, .35);
+  return cv;
+}
+$('saveTop').addEventListener('click', async ()=>{ const cv = drawTopList(); if(cv) save(cv, 'top-'+top.kind+'-'+(top.set ? top.set.i : top.period)+'.jpg', $('statusTop'), 'image/jpeg'); });
+$('copyTop').addEventListener('click', ()=>{
+  if(!topItems.length) return; const T = topTitle();
+  const head = top.kind === 'set' ? 'Top '+topItems.length+' most valuable cards in '+shortSet(top.set.name)+' (TCGplayer market, '+today.toLowerCase().replace(/\b\w/g, c=>c.toUpperCase())+'):'
+    : KINDS[top.kind]+' '+(top.period === 'month' ? 'this month' : 'this week')+' (TCGplayer market):';
+  const lines = topItems.slice(0, 5).map((x,k)=>'#'+(k+1)+' '+x.name+' '+money(fromUsd(x.best), x.best >= 1000 ? 0 : 2)+(top.kind==='gain'||top.kind==='drop' ? ' ('+(x.change>=0?'+':'-')+Math.abs(x.change*100).toFixed(1)+'%)' : ''));
+  const cap = head+'\n'+lines.join('\n')+'\n'+GAMES[game].tag+' #breakcheck pokesnipr.com';
+  const done = ()=>{ $('statusTop').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusTop').textContent = cap; };
+  try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
+});
+
 // ---------- my breaks (saved on this device) ----------
 // Stored in USD so switching currency never changes what you paid; re-priced to today's TCGplayer values when shown.
 let breaks = (store.get('breaks1') || []).filter(b=>b && b.id);
@@ -3133,17 +3350,19 @@ $('saveBreak').addEventListener('click', ()=>{
 
 // ---------- tabs ----------
 function showTab(t){
-  if(!['check','log','show'].includes(t)) t = 'check';
+  if(!['check','log','show','top'].includes(t)) t = 'check';
   const isCheck = t==='check';
-  ['check','log','show'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
+  ['check','log','show','top'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
   const changed = store.get('tab') !== t;
   if(changed) replay($('panel-'+t), 'enter');
   if(t==='show') updateShow();
+  if(t==='top') openTop();
   store.set('tab', t);
 }
 $('tab-check').addEventListener('click',()=>showTab('check'));
 $('tab-log').addEventListener('click',()=>showTab('log'));
 $('tab-show').addEventListener('click',()=>showTab('show'));
+$('tab-top').addEventListener('click',()=>showTab('top'));
 
 // ---------- inputs ----------
 $('pay').addEventListener('input',()=>{ markEdited('check'); updateCheck(); });

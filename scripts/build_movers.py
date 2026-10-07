@@ -23,7 +23,10 @@ def carry_over():
 
 mode = os.environ.get("MOVERS_MODE", "carry")
 if mode != "full" and carry_over():
-    sys.exit(0)
+    try: n_live = len(json.load(open(OUT))["rows"])
+    except Exception: n_live = 0
+    if n_live >= 3000: sys.exit(0)
+    print("movers: live file is thin (", n_live, "rows), rebuilding")
 
 def vfull(v):
     return "Normal" if not v else "Holofoil" if v == "Holo" else "Reverse Holofoil" if v == "Reverse" else v.replace("Holo", "Holofoil") if "Holofoil" not in v else v
@@ -44,14 +47,16 @@ print("movers: products to check", len(want))
 today = datetime.date.today()
 d7, d30 = today - datetime.timedelta(days=7), today - datetime.timedelta(days=30)
 
+# History comes through the site's own Worker (cached an hour, served from Cloudflare), at a gentle pace.
+API = os.environ.get("MOVERS_API", "https://pokesnipr.com/api/card")
 def hist(pid):
-    url = f"https://infinite-api.tcgplayer.com/price/history/{pid}/detailed?range=month"
-    for i in range(3):
-        try: return json.load(urllib.request.urlopen(urllib.request.Request(url, headers=H), timeout=30))
-        except urllib.error.HTTPError as e:
-            if e.code in (403, 404): return None
-            time.sleep(1.5 * (i + 1))
-        except Exception: time.sleep(1.5 * (i + 1))
+    url = f"{API}?id={pid}&r=month&sales=0"
+    for i in range(4):
+        try:
+            d = json.load(urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": H["User-Agent"]}), timeout=40))
+            if d.get("ok"): return d
+            time.sleep(3 * (i + 1))   # upstream had nothing / was busy: wait and retry
+        except Exception: time.sleep(3 * (i + 1))
     return None
 
 def work(pid):
@@ -60,12 +65,12 @@ def work(pid):
     out = []
     for variant, lang, game in want[pid]:
         vf = vfull(variant)
-        ser = [x for x in d.get("result") or [] if x.get("variant") == vf and x.get("condition") in ("Near Mint", "Unopened")]
+        ser = [x for x in d.get("series") or [] if x.get("variant") == vf and x.get("condition") in ("Near Mint", "Unopened")]
         ser = [x for x in ser if x.get("language") == lang] or ser
         if not ser: continue
         pts = []
-        for b in ser[0].get("buckets") or []:
-            try: pts.append((datetime.date.fromisoformat(b["bucketStartDate"][:10]), float(b["marketPrice"]), int(float(b.get("quantitySold") or 0))))
+        for p in ser[0].get("points") or []:
+            try: pts.append((datetime.date.fromisoformat(p[0][:10]), float(p[1]), int(p[2] or 0)))
             except Exception: pass
         pts = [p for p in pts if p[1] > 0]
         if len(pts) < 3: continue
@@ -80,7 +85,7 @@ def work(pid):
     return pid, out
 
 rows, done, t0, failed = [], 0, time.time(), 0
-with cf.ThreadPoolExecutor(8) as ex:
+with cf.ThreadPoolExecutor(int(os.environ.get('MOVERS_THREADS', '4'))) as ex:
     futs = {ex.submit(work, pid): pid for pid in want}
     for f in cf.as_completed(futs):
         pid, r = f.result(); done += 1
