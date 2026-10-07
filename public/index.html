@@ -882,8 +882,8 @@ header.top .tabs{margin-top:18px}
     // Top lists: the most valuable singles in one set
     if(q.get('settop')!=null){
       var si2=Number(q.get('settop')), n2=Math.min(30, Number(q.get('n'))||20), rowsT=[];
-      for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(best(e[5],e[6])==null) continue; rowsT.push(i); }
-      rowsT.sort(function(a,b){ return best(c.items[b][5],c.items[b][6]) - best(c.items[a][5],c.items[a][6]); });
+      for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(e[5]==null) continue; /* ranked by real sales only: a lone asking price isn't a value */ rowsT.push(i); }
+      rowsT.sort(function(a,b){ return c.items[b][5] - c.items[a][5]; });
       rowsT=rowsT.slice(0, n2+10);
       return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT};
     }
@@ -1019,7 +1019,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791394196';
+(function(){ var BUILD='1791399757';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -2574,7 +2574,7 @@ function updateCheck(){
   $('needle').style.left = (v.pos*100)+'%';
   $('rWorth').textContent = money(c.worth); $('rPay').textContent = money(c.pay);
   $('rDiff').textContent = (over?'-'+money(-v.diff):under?'+'+money(v.diff):money(0)); $('rDiff').className = toneClass(v.diff);
-  $('boxNote').textContent = (c.perPack && c.total && !c.stack) ? 'If all '+c.packs+' packs sell at '+money(c.pay)+', the breaker collects '+money(c.pay*c.packs)+' for a '+noun(c.name)+' that costs '+money(c.total)+'.' : '';
+  $('boxNote').textContent = (c.perPack && c.total && !c.stack) ? 'If all '+c.packs+' packs sell at '+money(c.pay)+', the breaker collects '+money(c.pay*c.packs)+' for '+(/^[AEIOU]/.test(noun(c.name))?'an ':'a ')+noun(c.name)+' that costs '+money(c.total)+'.' : '';
   clearTimeout(tCheck);
   tCheck = setTimeout(()=>{ $('verdictImg').src = drawVerdict(c).toDataURL('image/png'); if(window.__printVerdict){ window.__printVerdict=false; replay($('verdictHolo'),'sweep'); } }, 120);
   return c;

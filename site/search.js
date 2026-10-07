@@ -147,8 +147,8 @@ window.__noShare = true;
     // Top lists: the most valuable singles in one set
     if(q.get('settop')!=null){
       var si2=Number(q.get('settop')), n2=Math.min(30, Number(q.get('n'))||20), rowsT=[];
-      for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(best(e[5],e[6])==null) continue; rowsT.push(i); }
-      rowsT.sort(function(a,b){ return best(c.items[b][5],c.items[b][6]) - best(c.items[a][5],c.items[a][6]); });
+      for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(e[5]==null) continue; /* ranked by real sales only: a lone asking price isn't a value */ rowsT.push(i); }
+      rowsT.sort(function(a,b){ return c.items[b][5] - c.items[a][5]; });
       rowsT=rowsT.slice(0, n2+10);
       return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT};
     }

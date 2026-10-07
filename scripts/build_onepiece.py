@@ -57,6 +57,7 @@ with cf.ThreadPoolExecutor(6) as ex:
             ext = {e["name"]: e["value"] for e in (p.get("extendedData") or [])}
             num = ext.get("Number", "")
             card = bool(num) or bool(ext.get("Rarity")) or p["name"].startswith("DON!! Card")
+            if re.search(r"\b(playmat|sleeves?|deck box|binder|storage)\b", p["name"], re.I): card = False   # accessories, not cards
             items.append([p["productId"], p["name"], num, ext.get("Rarity", ""), vshort(pr.get("subTypeName") or ""), m, l, si, "c" if card else "s",
                           None if card else packs_for(p["name"], label)])
 

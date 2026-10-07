@@ -26,7 +26,7 @@ const ID_RE = /^[A-Za-z0-9]{8,16}$/;
 
 // ---- Chinese singles: completed-sale prices from CardOS, fetched per card and kept 24h ----
 const CARDOS = "https://api.getcardos.com/api/v1/pokemon";
-const CN_ID = /^[A-Za-z0-9_.-]{2,40}$/;
+const CN_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{1,39}$/;
 async function cnPrices(url, env, ctx) {
   const ids = (url.searchParams.get("ids") || "").split(",").map((x) => x.trim()).filter((x) => CN_ID.test(x)).slice(0, 12);
   if (!ids.length) return json({ prices: {} });
@@ -339,8 +339,42 @@ ${breakdown}
 </html>`;
 }
 
+// Security headers on every response. Pages get a strict content policy: everything comes from this site,
+// apart from Google Fonts. Nothing can frame the site.
+const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:", "img-src 'self' data: blob:", "connect-src 'self'", "media-src 'self' blob:",
+  "worker-src 'self' blob:", "manifest-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"].join("; ");
+function secure(res) {
+  if (!res || res.status === 101) return res;
+  const out = new Response(res.body, res);
+  const h = out.headers;
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  h.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  h.set("X-Frame-Options", "DENY");
+  if ((h.get("Content-Type") || "").includes("text/html")) h.set("Content-Security-Policy", CSP);
+  return out;
+}
+
+// Per-visitor limits on the routes that cost something (storage writes, paid lookups, upstream calls).
+// Generous for people, tight enough to stop a script hammering them.
+async function limited(env, req, path) {
+  const ip = req.headers.get("CF-Connecting-IP") || "?";
+  const write = path.startsWith("/api/share");
+  const paid = path === "/api/cn/prices" || path === "/api/xavatar";
+  const lim = write || paid ? env.LIMIT_STRICT : env.LIMIT_API;
+  if (!lim) return false;
+  try { const { success } = await lim.limit({ key: `${write ? "w" : paid ? "p" : "a"}:${ip}` }); return !success; } catch { return false; }
+}
+
 export default {
   async fetch(req, env, ctx) {
+    return secure(await route(req, env, ctx));
+  },
+};
+
+async function route(req, env, ctx) {
     const url = new URL(req.url);
     const path = url.pathname;
 
@@ -348,6 +382,9 @@ export default {
     if (url.hostname === "www.pokesnipr.com" || url.hostname.endsWith(".workers.dev")) {
       return Response.redirect(`https://pokesnipr.com${path}${url.search}`, 301);
     }
+
+    if (path.startsWith("/api/") && path !== "/api/fx" && await limited(env, req, path))
+      return json({ error: "Too many requests. Try again in a minute." }, 429, { "Retry-After": "60", "Cache-Control": "no-store" });
 
     if (path === "/api/fx") return fx(ctx);
 
@@ -401,5 +438,4 @@ export default {
       return res;
     }
     return asset;
-  },
-};
+}

@@ -2282,7 +2282,7 @@ function updateCheck(){
   $('needle').style.left = (v.pos*100)+'%';
   $('rWorth').textContent = money(c.worth); $('rPay').textContent = money(c.pay);
   $('rDiff').textContent = (over?'-'+money(-v.diff):under?'+'+money(v.diff):money(0)); $('rDiff').className = toneClass(v.diff);
-  $('boxNote').textContent = (c.perPack && c.total && !c.stack) ? 'If all '+c.packs+' packs sell at '+money(c.pay)+', the breaker collects '+money(c.pay*c.packs)+' for a '+noun(c.name)+' that costs '+money(c.total)+'.' : '';
+  $('boxNote').textContent = (c.perPack && c.total && !c.stack) ? 'If all '+c.packs+' packs sell at '+money(c.pay)+', the breaker collects '+money(c.pay*c.packs)+' for '+(/^[AEIOU]/.test(noun(c.name))?'an ':'a ')+noun(c.name)+' that costs '+money(c.total)+'.' : '';
   clearTimeout(tCheck);
   tCheck = setTimeout(()=>{ $('verdictImg').src = drawVerdict(c).toDataURL('image/png'); if(window.__printVerdict){ window.__printVerdict=false; replay($('verdictHolo'),'sweep'); } }, 120);
   return c;
