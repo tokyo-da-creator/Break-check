@@ -89,7 +89,7 @@ async function fx(ctx) {
 
 // Live TCGplayer Market Price, the exact number tcgplayer.com shows right now.
 // The page asks for "productId:N" (normal printing) or "productId:F" (foil printing); each product is cached for 15 minutes.
-const LIVE_TTL = 900;
+const LIVE_TTL = 300;
 async function livePoints(id, ctx) {
   const cache = caches.default;
   const key = new Request(`https://cache.breakcheck/live/${id}`);

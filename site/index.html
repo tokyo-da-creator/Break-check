@@ -2980,7 +2980,7 @@ function drawShowcase(st){
   grainVignette(ctx, rnd, .022, .4);
   return cv;
 }
-$('saveShow').addEventListener('click', ()=>{ const st = showStats(); if(!st) return; const cv = st.watch ? drawPriceWatch(st) : drawShowcase(st); if(cv) save(cv, (st.watch ? 'price-watch-' : 'card-spotlight-')+st.it.id+'.jpg', $('statusShow'), 'image/jpeg'); });
+$('saveShow').addEventListener('click', async ()=>{ await refreshPrices(); const st = showStats(); if(!st) return; const cv = st.watch ? drawPriceWatch(st) : drawShowcase(st); if(cv) save(cv, (st.watch ? 'price-watch-' : 'card-spotlight-')+st.it.id+'.jpg', $('statusShow'), 'image/jpeg'); });
 $('copyShow').addEventListener('click', ()=>{
   const st = showStats(); if(!st) return; const it = st.it;
   const tag = GAMES[it.game==='onepiece' ? 'onepiece' : 'pokemon'].tag;
@@ -3187,6 +3187,7 @@ async function refreshPrices(){
   const ids = new Set();
   if(prod && prod.id) ids.add(prod.id);
   stack.forEach(x=>{ if(x.id) ids.add(x.id); });
+  try{ if(show && show.item && show.item.id) ids.add(show.item.id); }catch(e){}
   sealedList.forEach(x=>{ if(x.id) ids.add(x.id); });
   hits.forEach(h=>{ if(!h.manual && h.id) ids.add(h.id); });
   if(!ids.size) return;
@@ -3198,6 +3199,7 @@ async function refreshPrices(){
     if(prod && prod.id){ const x = map.get(key(prod.id, prod.variant)); if(x){ const had = prod.usd; prod.usd = x.best; prod.basis = x.basis;
       if(had == null && x.best != null && worthSrc === 'self' && !$('worth').value){ worthSrc = 'data'; manualOpen = false; } } }
     stack.forEach(it=>{ const x = map.get(key(it.id, it.variant)); if(x) it.usd = x.best; });
+    try{ if(show && show.item){ const x = map.get(key(show.item.id, show.item.variant)); if(x && x.best!=null && x.best !== show.item.usd){ show.item.usd = x.best; saveShowState(); updateShow(); } } }catch(e){}
     let sc = false; sealedList.forEach(it=>{ const x = map.get(key(it.id, it.variant)); if(x){ it.usd = x.best; it.verified = x.best!=null; sc = true; } });
     if(sc){ saveSealed(); paintLogMode(); }
     hits.forEach(h=>{
@@ -3315,6 +3317,9 @@ window.__draw = {drawBreakCard, drawReceipt, drawReceiptWide, drawVerdict, logDa
 $('zoom').addEventListener('click', ()=>{ $('zoom').hidden = true; });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') $('zoom').hidden = true; });
 paintGame();
+// Prices stay current while the page is open: every 5 minutes, and whenever you come back to the tab.
+setInterval(()=>{ if(!document.hidden) refreshPrices(); }, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshPrices(); });
 loadFx().then(()=>{ loadFeatured(); refreshPrices(); renderHistory(); repriceHistory(); });
 // Keep prices live while the page is open.
 setInterval(refreshPrices, 10*60*1000);
