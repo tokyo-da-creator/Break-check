@@ -109,7 +109,7 @@ window.__noShare = true;
   function res(c,i){
     var e=c.items[i], s=c.sets[e[7]];
     return {id:e[0], name:e[1], number:e[2], rarity:e[3], variant:e[4], market:e[5], low:e[6], best:best(e[5],e[6]),
-      basis:e[5]==null?'listing':'sales', set:s[0], game:c.game||'pokemon', jp:s[2]===1, cn:s[2]===2, source:s[2]===2?(c.cn[e[0]]?'CardOS':'PriceCharting'):'TCGplayer', lang:s[2]===1?'jp':s[2]===2?'cn':'en', kind:e[8]==='s'?'sealed':'card', packs:e[9]};
+      basis:e[5]==null?'listing':'sales', set:s[0], setDate:s[1]||'', game:c.game||'pokemon', jp:s[2]===1, cn:s[2]===2, source:s[2]===2?(c.cn[e[0]]?'CardOS':'PriceCharting'):'TCGplayer', lang:s[2]===1?'jp':s[2]===2?'cn':'en', kind:e[8]==='s'?'sealed':'card', packs:e[9]};
   }
   var NOT_A_SET=/miscellaneous|promo|prize pack|trainer kit|collection|deck|championship|jumbo|energ|release event|pre-release|tournament|starter|don!!|premium card/i;
   var BREAKABLE={1:1,6:1,9:1,10:1,11:1,24:1,36:1};

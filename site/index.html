@@ -2357,7 +2357,7 @@ function updateCheck(){
 
 // ---------- log my pulls ----------
 let hits = (store.get('hits3') || []).filter(h=>h && typeof h==='object');
-const GRADES = ['Raw','PSA 10','PSA 9','PSA 8','CGC 10','CGC 9.5','BGS 10','BGS 9.5','TAG 10','Other graded'];
+const GRADES = ['Raw','PSA 10','PSA 9','PSA 8','PSA 7','BGS 10 Black Label','BGS 10','BGS 9.5','BGS 9','CGC 10 Pristine','CGC 10','CGC 9.5','CGC 9','TAG 10','TAG 9','Other graded'];
 function renderHits(){
   const box = $('hits'); box.textContent='';
   hits.forEach((h,i)=>{
@@ -2726,7 +2726,7 @@ GRADES.forEach(g=>{ const o = document.createElement('option'); o.value = g; o.t
 WHERE.forEach(w=>{ const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = w; b.dataset.w = w;
   b.addEventListener('click', ()=>{ show.where = show.where === w ? '' : w; saveShowState(); updateShow(); }); $('showWhere').append(b); });
 function pickShow(it){
-  show.item = {id: it.id, variant: it.variant||'', name: it.kind==='card' && it.number ? it.name+' '+it.number : it.name, baseName: it.name, number: it.number||'', rarity: it.rarity||'',
+  show.item = {id: it.id, setDate: it.setDate||'', variant: it.variant||'', name: it.kind==='card' && it.number ? it.name+' '+it.number : it.name, baseName: it.name, number: it.number||'', rarity: it.rarity||'',
     set: it.set, lang: it.cn ? 'cn' : it.jp ? 'jp' : 'en', game: it.game||game, usd: it.best, kind: it.kind};
   saveShowState(); markEnter(it.id); loadShowData(); updateShow();
   // today's live price for exactly this printing
@@ -2892,15 +2892,15 @@ function spotFit(ctx, txt, font, size, maxW, min){ let fs = size; ctx.font = fon
 function spotTicker(K){
   const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
   const chg = st.change==null ? null : Math.abs(st.change*100);
-  spotLabel(ctx, '90-DAY CHANGE', 52, 952, faint);
-  const big = chg==null ? '—' : (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%';
+  spotLabel(ctx, chg==null ? 'MARKET PRICE' : '90-DAY CHANGE', 52, 952, faint);
+  const big = chg==null ? (st.market!=null ? m(fromUsd(st.market)) : 'NO DATA') : (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%';
   spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
   if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
     const a = m(fromUsd(st.pts[0][1])), b = m(st.market!=null ? fromUsd(st.market) : fromUsd(st.pts[st.pts.length-1][1])); ctx.fillText(a+'  →  '+b, 52, 1148); }
   ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : 'TCGplayer market price', 52, 1178);
   if(st.pts.length >= 2){ spotSpark(ctx, st.pts, 470, 950, 1024, 1150, cA, {start: true, fillDrop: 40});
     ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; ctx.fillText(shortDate(st.pts[0][0]), 470, 1186); ctx.textAlign = 'right'; ctx.fillText('TODAY', 1024, 1186); ctx.textAlign = 'left'; spaced(ctx, 0); }
-  else { ctx.font = '500 17px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No price history yet.', 470, 1060); }
+  else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer sales in the last 90 days.', 470, 1060); }
   // three facts
   const facts = [];
   if(st.sales[0]) facts.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), (COND[st.sales[0].cond]||'')+' · '+shortDate(st.sales[0].d)]);
@@ -2915,6 +2915,60 @@ function spotTicker(K){
     ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1292); });
 }
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
+// A graded slab: clear acrylic case, the grader's label on top, the card sealed inside.
+// Styled after each grader's look (PSA red frame, Beckett gold or black, CGC navy, TAG black) without copying their logos.
+function slabStyle(grade){
+  const g = grade.toUpperCase(), n = (g.match(/\d+(\.\d)?/)||[''])[0];
+  const word = /BLACK LABEL/.test(g) ? 'PRISTINE' : /PRISTINE/.test(g) ? 'PRISTINE' : n==='10' ? (/^PSA/.test(g) ? 'GEM MT' : 'GEM MINT') : n==='9.5' ? 'GEM MINT' : n==='9' ? 'MINT' : n==='8' ? 'NM-MT' : n==='7' ? 'NM' : 'GRADED';
+  if(/^PSA/.test(g)) return {co: 'PSA', n, word, bg: '#FBFAF7', ink: '#141414', frame: '#D0192B', badge: '#1F4E9C', badgeInk: '#fff'};
+  if(/^BGS/.test(g)) return /BLACK/.test(g) ? {co: 'BECKETT', n, word, bg: '#0E0E10', ink: '#F1F1F1', frame: '#2A2A2E', badge: '#F1F1F1', badgeInk: '#0E0E10', dark: true}
+                                          : {co: 'BECKETT', n, word, bg: '#121212', ink: '#E6C46A', frame: '#C9A227', badge: '#C9A227', badgeInk: '#121212', dark: true};
+  if(/^CGC/.test(g)) return {co: 'CGC', n, word, bg: '#F7F8FB', ink: '#16233F', frame: '#1B3A6B', badge: '#1B3A6B', badgeInk: '#fff'};
+  if(/^TAG/.test(g)) return {co: 'TAG', n, word, bg: '#0B0B0C', ink: '#F4F4F4', frame: '#3A3A3E', badge: '#F4F4F4', badgeInk: '#0B0B0C', dark: true};
+  return {co: 'GRADED', n, word, bg: '#F4F2EE', ink: '#151515', frame: '#555', badge: '#222', badgeInk: '#fff'};
+}
+function drawSlab(ctx, im, it, grade, cx, cy, H, ang, glow){
+  const S = slabStyle(grade), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const pad = 22, labH = H*0.21, gap = 14, cardH = H - labH - gap - pad*2 - 10, cardW = cardH*iw/ih, W2 = cardW + pad*2 + 12, x0 = -W2/2, y0 = -H/2;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+  // case: glow, shadow, acrylic body
+  ctx.save(); ctx.shadowColor = hexA(glow, .6); ctx.shadowBlur = 110; rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 26; rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = 'rgba(30,32,38,.55)'; ctx.fill(); ctx.restore();
+  const body = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H); body.addColorStop(0, 'rgba(255,255,255,.20)'); body.addColorStop(.5, 'rgba(255,255,255,.07)'); body.addColorStop(1, 'rgba(255,255,255,.16)');
+  rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = body; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.stroke();
+  rrect(ctx, x0 + 8, y0 + 8, W2 - 16, H - 16, 16); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
+  // label
+  const lx = x0 + pad, ly = y0 + pad, lw = W2 - pad*2;
+  rrect(ctx, lx, ly, lw, labH, 6); ctx.fillStyle = S.bg; ctx.fill();
+  rrect(ctx, lx + 5, ly + 5, lw - 10, labH - 10, 4); ctx.lineWidth = 5; ctx.strokeStyle = S.frame; ctx.stroke();
+  const year = (it.setDate||'').slice(0, 4), gameW = it.game === 'onepiece' ? 'ONE PIECE' : it.lang === 'en' ? 'POKEMON' : 'P.M.', langW = it.lang === 'jp' ? ' JAPANESE' : it.lang === 'cn' ? ' CHINESE' : '';
+  const nm = (it.baseName || it.name || '').replace(/\s*\(.*?\)\s*/g, ' ').trim().toUpperCase() + (/holo/i.test(it.variant||'') && !/reverse/i.test(it.variant) ? '-HOLO' : '');
+  const lines = [(year ? year+' ' : '') + gameW + langW, nm, shortSet(it.set).toUpperCase()];
+  const num = it.number ? '#'+String(it.number).split('/')[0] : '';
+  const tx = lx + 18, rx = lx + lw - 18, fs = Math.round(labH*0.125), lh = labH*0.175, ty = ly + labH*0.27;
+  ctx.textBaseline = 'alphabetic'; ctx.fillStyle = S.ink;
+  ctx.font = '700 '+Math.round(fs*1.05)+'px Archivo'; ctx.textAlign = 'right';
+  const rightW = Math.max(ctx.measureText(num).width, ctx.measureText(S.word).width, ctx.measureText(S.n).width);
+  ctx.fillText(num, rx, ty); ctx.fillText(S.word, rx, ty + lh);
+  ctx.font = '800 '+Math.round(fs*1.35)+'px Archivo'; ctx.fillText(S.n || '', rx, ty + lh*2 + fs*0.2);
+  ctx.textAlign = 'left'; ctx.font = '700 '+fs+'px Archivo';
+  lines.forEach((l, i)=>{ let f2 = fs; ctx.font = '700 '+f2+'px Archivo'; const room = lw - 36 - rightW - 14;
+    while(ctx.measureText(l).width > room && f2 > fs*0.78){ f2 -= 1; ctx.font = '700 '+f2+'px Archivo'; } ctx.fillText(clip(ctx, l, room), tx, ty + i*lh); });
+  // grader badge, bottom centre of the label
+  ctx.font = '900 '+Math.round(fs*1.0)+'px Archivo'; spaced(ctx, 1); const bw = ctx.measureText(S.co).width + 22, bh = fs*1.45;
+  rrect(ctx, lx + lw/2 - bw/2, ly + labH - bh - 11, bw, bh, 4); ctx.fillStyle = S.badge; ctx.fill();
+  ctx.fillStyle = S.badgeInk; ctx.textAlign = 'center'; ctx.fillText(S.co, lx + lw/2, ly + labH - 11 - bh*0.28); ctx.textAlign = 'left'; spaced(ctx, 0);
+  // card well + card
+  const wx = -cardW/2 - 6, wy = ly + labH + gap, ww = cardW + 12, wh = cardH + 12;
+  rrect(ctx, wx, wy, ww, wh, 10); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
+  ctx.save(); rrect(ctx, -cardW/2, wy + 6, cardW, cardH, cardW*0.04); ctx.clip(); ctx.drawImage(im, -cardW/2, wy + 6, cardW, cardH); ctx.restore();
+  // acrylic glare over everything
+  ctx.save(); rrect(ctx, x0, y0, W2, H, 22); ctx.clip();
+  const gl = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H); gl.addColorStop(.22, 'rgba(255,255,255,0)'); gl.addColorStop(.33, 'rgba(255,255,255,.20)'); gl.addColorStop(.38, 'rgba(255,255,255,.04)'); gl.addColorStop(.62, 'rgba(255,255,255,0)'); gl.addColorStop(.7, 'rgba(255,255,255,.10)'); gl.addColorStop(.74, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl; ctx.fillRect(x0, y0, W2, H); ctx.restore();
+  ctx.restore();
+  return W2;
+}
 function drawShowcase(st){
   if(!bcFonts()) return null;
   const it = st.it, W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -2947,7 +3001,11 @@ function drawShowcase(st){
   // ---- the card, tilted a touch, foil catching the light ----
   const CH = 640, CY = 132, ang = -0.045;
   let cardBox = null;
-  if(art){
+  if(art && show.grade !== 'Raw'){
+    const cx = 500, cy = CY + CH/2 - 6, cw = drawSlab(ctx, art.img, it, show.grade, cx, cy, CH + 24, ang, cA);
+    cardBox = {cx, cy, cw};
+    drawTag(cx, cw);
+  } else if(art){
     const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, cw = CH*iw/ih, r = cw*0.045, cx = 500, cy = CY + CH/2;
     cardBox = {cx, cy, cw};
     ctx.save(); ctx.translate(cx, cy + 40); ctx.scale(1, 0.12); blob(ctx, 0, CH/2*8.3, cw*0.75, 'rgba(0,0,0,.75)'); ctx.restore();
@@ -2963,20 +3021,16 @@ function drawShowcase(st){
     const gl = ctx.createLinearGradient(-cw/2, -CH/2, cw/2, CH/2); gl.addColorStop(.28, 'rgba(255,255,255,0)'); gl.addColorStop(.4, 'rgba(255,255,255,.22)'); gl.addColorStop(.46, 'rgba(255,255,255,0)');
     ctx.fillStyle = gl; ctx.fillRect(-cw/2, -CH/2, cw, CH); ctx.restore();
     rrect(ctx, -cw/2, -CH/2, cw, CH, r); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.stroke();
-    // grade label on top of the card
-    if(show.grade !== 'Raw'){
-      const t = show.grade.toUpperCase(), col = /^PSA/.test(t) ? '#D0192B' : /^BGS/.test(t) ? '#B8901C' : /^CGC/.test(t) ? '#1F57C3' : /^TAG/.test(t) ? '#111' : '#333';
-      ctx.font = '900 30px Archivo'; spaced(ctx, 2); const tw = ctx.measureText(t).width, pw = Math.max(tw + 60, cw*0.62), ph = 62, py = -CH/2 - 34;
-      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 8; rrect(ctx, -pw/2, py, pw, ph, 10); ctx.fillStyle = '#F7F5F0'; ctx.fill(); ctx.restore();
-      rrect(ctx, -pw/2 + 5, py + 5, pw - 10, ph - 10, 7); ctx.lineWidth = 3; ctx.strokeStyle = col; ctx.stroke();
-      ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, 0, py + ph/2 + 1); spaced(ctx, 0);
-    }
     ctx.restore();
-    // price tag hanging off the card
+    drawTag(cx, cw);
+  } else { packIcon(ctx, 540 - 150, CY + 170, 300, cA); }
+  // price tag hanging off the card (or slab)
+  function drawTag(cx, cw){
     const tagV = st.graded || (st.market!=null ? fromUsd(st.market) : null);
     if(tagV!=null){
-      const lab = st.graded ? show.grade.toUpperCase()+' VALUE' : 'MARKET PRICE', val = m(tagV);
-      ctx.font = '400 74px Anton'; const vw = ctx.measureText(val).width, tw2 = Math.max(vw + 100, 260), th = 150;
+      const lab = st.graded ? 'GRADED VALUE' : 'MARKET PRICE', val = m(tagV);
+      ctx.font = '700 15px "JetBrains Mono"'; spaced(ctx, 3); const lw0 = ctx.measureText(lab).width; spaced(ctx, 0);
+      ctx.font = '400 74px Anton'; const vw = ctx.measureText(val).width, tw2 = Math.max(vw + 100, lw0 + 100, 260), th = 150;
       ctx.save(); ctx.translate(Math.min(W - 40 - tw2/2, cx + cw/2 + tw2/2 - 46), CY + CH*0.8); ctx.rotate(0.08);
       // string to the card
       ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-tw2/2 + 34, -th/2 + 30); ctx.quadraticCurveTo(-tw2/2 - 30, -th/2 - 50, -tw2/2 - 70, -th/2 - 30); ctx.stroke();
@@ -2990,7 +3044,7 @@ function drawShowcase(st){
       ctx.font = '400 74px Anton'; ctx.fillStyle = '#0B0B0C'; ctx.fillText(val, -tw2/2 + 74, th/2 - 26);
       ctx.restore();
     }
-  } else { packIcon(ctx, 540 - 150, CY + 170, 300, cA); }
+  }
   // ---- name ----
   ctx.save(); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   let fs = 50; ctx.font = '800 '+fs+'px Archivo'; while(ctx.measureText(it.name).width > W - 104 && fs > 30){ fs -= 2; ctx.font = '800 '+fs+'px Archivo'; }
