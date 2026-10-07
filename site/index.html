@@ -327,6 +327,8 @@ header.top .tabs{margin-top:18px}
   .btn:hover{border-color:color-mix(in srgb,var(--fg) 40%,var(--line))}
 }
 /* show a card */
+.row-photo{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.row-photo .btn.sm{min-height:40px;padding:0 16px;flex:none}
 .sel{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px var(--body);padding:0 12px}
 .spark svg{display:block;width:100%;height:110px}
 .sales{display:flex;flex-direction:column;gap:6px}
@@ -593,6 +595,24 @@ header.top .tabs{margin-top:18px}
         <button class="linkbtn" id="showClear" type="button">Change</button>
       </div>
     </div>
+    <div class="step" id="showOpts" hidden>
+      <div class="seg" role="group" aria-label="What kind of card">
+        <button id="mode-own" type="button" aria-pressed="true">My card</button>
+        <button id="mode-watch" type="button" aria-pressed="false">Price watch</button>
+      </div>
+      <div class="hint" id="modeHint"></div>
+      <div class="seg slim" role="group" aria-label="Time range" style="grid-template-columns:repeat(3,1fr)">
+        <button id="rng-month" type="button" aria-pressed="false">30 days</button>
+        <button id="rng-quarter" type="button" aria-pressed="true">90 days</button>
+        <button id="rng-annual" type="button" aria-pressed="false">1 year</button>
+      </div>
+      <div class="row-photo">
+        <button class="btn sm" id="photoBtn" type="button">Use my own photo</button>
+        <button class="linkbtn" id="photoClear" type="button" hidden>Remove photo</button>
+        <input type="file" id="photoFile" accept="image/*" hidden>
+      </div>
+      <div class="hint">Your photo (like your slab) replaces the card picture on the image.</div>
+    </div>
     <div class="step" id="showMore" hidden>
       <div class="stephead"><span class="num">2</span><label for="showGrade">Raw or graded?</label></div>
       <select id="showGrade" class="sel"></select>
@@ -626,7 +646,7 @@ header.top .tabs{margin-top:18px}
       <div class="status" id="statusShow"></div>
     </div>
     <div class="preview" id="showPreview" hidden>
-      <div class="eyebrow">Card spotlight · sized for posts<span class="touch-only"> · press and hold to save</span></div>
+      <div class="eyebrow"><span id="showEyebrow">Card spotlight · sized for posts</span><span class="touch-only"> · press and hold to save</span></div>
       <div class="holo" id="showHolo"><img id="showImg" alt="Card spotlight share image"></div>
     </div>
    </div>
@@ -2552,7 +2572,10 @@ $('saveBanner').addEventListener('click', ()=>{
 });
 
 // ---------- show a card: one card, its whole price story ----------
-let show = Object.assign({item: null, grade: 'Raw', graded: '', paid: '', where: ''}, store.get('show1') || {});
+let show = Object.assign({item: null, grade: 'Raw', graded: '', paid: '', where: '', mode: 'own', range: 'quarter'}, store.get('show1') || {});
+let showPhoto = null;   // your own picture (e.g. your slab); kept for this visit only
+const showPhotoImg = new Image(); showPhotoImg.onload = ()=>{ softCache.delete('photo'); palCache.delete('photo'); updateShow(); };
+const RANGES = {month: {cap: '30-DAY', txt: 'over 30 days', ago: '30 DAYS AGO'}, quarter: {cap: '90-DAY', txt: 'over 90 days', ago: '90 DAYS AGO'}, annual: {cap: '1-YEAR', txt: 'over the past year', ago: '1 YEAR AGO'}};
 const showData = new Map();   // id -> {series, sales} from TCGplayer (via the Worker)
 const WHERE = ['TCGplayer', 'eBay', 'Whatnot', 'Card show', 'Local shop', 'Pulled it'];
 const COND = {'Near Mint':'NM','Lightly Played':'LP','Moderately Played':'MP','Heavily Played':'HP','Damaged':'DMG','Unopened':'SEALED'};
@@ -2571,14 +2594,25 @@ function pickShow(it){
     if(x && show.item && show.item.id===it.id && x.best!=null){ show.item.usd = x.best; saveShowState(); updateShow(); } }).catch(()=>{});
 }
 function loadShowData(){
-  const it = show.item; if(!it || showData.has(it.id) || it.lang==='cn') return;
-  showData.set(it.id, null);
-  fetch('/api/card?id='+it.id).then(r=>r.ok ? r.json() : null).then(d=>{ showData.set(it.id, d || {series:[], sales:[]}); updateShow(); })
-    .catch(()=>{ showData.set(it.id, {series:[], sales:[]}); updateShow(); });
+  const it = show.item, key = it && it.id+'|'+show.range; if(!it || showData.has(key) || it.lang==='cn') return;
+  showData.set(key, null);
+  fetch('/api/card?id='+it.id+'&r='+show.range).then(r=>r.ok ? r.json() : null).then(d=>{ showData.set(key, d || {series:[], sales:[]}); updateShow(); })
+    .catch(()=>{ showData.set(key, {series:[], sales:[]}); updateShow(); });
 }
 makeSearch($('showSearch'), $('showResults'), 'card', pickShow);
 $('showClear').addEventListener('click', ()=>{ show.item = null; saveShowState(); updateShow(); $('showSearch').focus(); });
-$('clearShow').addEventListener('click', ()=>{ show = {item: null, grade: 'Raw', graded: '', paid: '', where: ''}; saveShowState(); updateShow(); });
+$('clearShow').addEventListener('click', ()=>{ show = {item: null, grade: 'Raw', graded: '', paid: '', where: '', mode: show.mode, range: show.range}; showPhoto = null; saveShowState(); updateShow(); });
+['own','watch'].forEach(m=>$('mode-'+m).addEventListener('click', ()=>{ show.mode = m; saveShowState(); updateShow(); }));
+Object.keys(RANGES).forEach(r=>$('rng-'+r).addEventListener('click', ()=>{ show.range = r; saveShowState(); loadShowData(); updateShow(); }));
+$('photoBtn').addEventListener('click', ()=>$('photoFile').click());
+$('photoFile').addEventListener('change', async ()=>{
+  const f = $('photoFile').files && $('photoFile').files[0]; if(!f) return;
+  try{ const bmp = await createImageBitmap(f), k = Math.min(1, 1400/Math.max(bmp.width, bmp.height)), c = document.createElement('canvas'); c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); showPhoto = c.toDataURL('image/jpeg', 0.9); showPhotoImg.src = showPhoto; }
+  catch(e){ $('statusShow').textContent = 'That photo couldn’t be opened. Try another.'; }
+  $('photoFile').value = '';
+});
+$('photoClear').addEventListener('click', ()=>{ showPhoto = null; showPhotoImg.removeAttribute('src'); updateShow(); });
 $('showGrade').addEventListener('change', ()=>{ show.grade = $('showGrade').value; saveShowState(); updateShow(); });
 $('showGraded').addEventListener('input', ()=>{ show.graded = $('showGraded').value; saveShowState(); updateShow(); });
 $('showPaid').addEventListener('input', ()=>{ show.paid = $('showPaid').value; saveShowState(); updateShow(); });
@@ -2586,7 +2620,7 @@ $('showPic').addEventListener('click', ()=>{ if(show.item) openZoom(show.item.id
 // The numbers behind the card: TCGplayer history for this printing (near mint), recent sales with obvious outliers dropped.
 function showStats(){
   const it = show.item; if(!it) return null;
-  const data = showData.get(it.id);
+  const data = showData.get(it.id+'|'+show.range);
   const lang = LANGN[it.lang] || 'English', vf = vFull(it.variant);
   let series = null;
   if(data && data.series && data.series.length){
@@ -2594,6 +2628,8 @@ function showStats(){
     series = data.series.slice().sort((a,b)=>sc(b)-sc(a) || b.sold-a.sold)[0];
   }
   let pts = series ? series.points : [];
+  // No sales at all in the period: TCGplayer just repeats an old price, so there's no real history to show.
+  if(series && !series.sold && !pts.some(p=>p[2] > 0)) pts = [];
   // New cards: before a card really trades, TCGplayer carries one early (often pre-order) sale forward for weeks,
   // and its rolling market price lags the first big week of real sales. Start where trading actually begins.
   let trimmed = false;
@@ -2604,8 +2640,13 @@ function showStats(){
     if(k >= 2){ pts = pts.slice(k); trimmed = true;
       while(pts.length > 3 && pts[0][1] > pts[1][1]*1.8 && pts[1][2] >= need) pts = pts.slice(1); }
   }
-  const period = trimmed ? 'since '+shortDate(pts[0][0]).toLowerCase().replace(/\b\w/g, c=>c.toUpperCase()) : 'over 90 days';
-  const periodCap = trimmed ? 'SINCE '+shortDate(pts[0][0]) : '90-DAY';
+  const RG = RANGES[show.range] || RANGES.quarter;
+  // History that starts well after the period began (a newer card, or first sale later) is labelled by its real start.
+  const days = {month: 30, quarter: 90, annual: 365}[show.range] || 90;
+  if(!trimmed && pts.length && (Date.now() - Date.parse(pts[0][0]+'T00:00:00Z'))/864e5 < days*0.85) trimmed = 'late';
+  const period = trimmed ? 'since '+shortDate(pts[0][0]).toLowerCase().replace(/\b\w/g, c=>c.toUpperCase()) : RG.txt;
+  const periodCap = trimmed ? 'SINCE '+shortDate(pts[0][0]) : RG.cap;
+  const agoCap = trimmed === true ? 'AT RELEASE' : trimmed ? 'THEN' : RG.ago;
   const market = it.usd!=null ? it.usd : pts.length ? pts[pts.length-1][1] : null;
   const first = pts.length ? pts[0][1] : null;
   const change = market!=null && first ? market/first - 1 : null;
@@ -2616,7 +2657,7 @@ function showStats(){
   sales = sales.slice(0, 5);
   const lows = pts.map(p=>p[1]), lo = lows.length ? Math.min(...lows) : null, hi = lows.length ? Math.max(...lows) : null;
   const paid = num(show.paid), graded = show.grade!=='Raw' ? num(show.graded) : NaN;
-  return {it, data, loading: data===null || (data===undefined && it.lang!=='cn'), pts, market, change, sold, sales, lo, hi, period, periodCap, trimmed,
+  return {it, data, loading: data===null || (data===undefined && it.lang!=='cn'), pts, market, change, sold, sales, lo, hi, period, periodCap, agoCap, trimmed, watch: show.mode === 'watch',
     paid: paid>0 ? paid : null, graded: graded>0 ? graded : null};
 }
 const shortDate = d => { const t = new Date(d+'T00:00:00Z'); return isNaN(t) ? d : t.toLocaleDateString('en-AU', {day:'numeric', month:'short', timeZone:'UTC'}).toUpperCase(); };
@@ -2631,7 +2672,12 @@ function sparkSvg(pts, col){
 let tShow;
 function updateShow(){
   const it = show.item;
-  $('showPick').hidden = !!it; $('showCard').hidden = !it; $('showMore').hidden = !it;
+  const watch = show.mode === 'watch';
+  $('showPick').hidden = !!it; $('showCard').hidden = !it; $('showOpts').hidden = !it; $('showMore').hidden = !it || watch;
+  $('mode-own').setAttribute('aria-pressed', !watch); $('mode-watch').setAttribute('aria-pressed', watch);
+  Object.keys(RANGES).forEach(r=>$('rng-'+r).setAttribute('aria-pressed', r === (show.range||'quarter')));
+  $('modeHint').textContent = watch ? 'Price watch: just the card’s price and how it’s moved. Good for posting about any card, owned or not.' : 'My card: add your grade and what you paid.';
+  $('photoClear').hidden = !showPhoto; $('photoBtn').textContent = showPhoto ? 'Change photo' : 'Use my own photo';
   $('showGrade').value = show.grade; $('showGradedWrap').hidden = show.grade==='Raw';
   if($('showGraded').value !== show.graded) $('showGraded').value = show.graded;
   if($('showPaid').value !== show.paid) $('showPaid').value = show.paid;
@@ -2639,18 +2685,18 @@ function updateShow(){
   const st = showStats();
   $('showEmpty').hidden = !!st; $('showOut').hidden = !st; $('showPreview').hidden = !st;
   if(!st){ return; }
-  if(!showData.has(it.id) && it.lang!=='cn') loadShowData();
+  if(!showData.has(it.id+'|'+show.range) && it.lang!=='cn') loadShowData();
   $('showName').textContent = it.name;
   if($('showPic').dataset.id != it.id) showPic($('showPic'), it.id, false);
   $('showSub').textContent = [rarAbbr(it.rarity), it.variant, it.set, LANGN[it.lang]].filter(Boolean).join(' · ');
   const up = st.change!=null && st.change >= 0;
   $('showBig').textContent = st.market!=null ? money(fromUsd(st.market)) : 'No price yet'; $('showBig').style.color = 'var(--fg)';
   $('showLine').textContent = st.loading ? 'Getting 90 days of sales from TCGplayer…'
-    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold.toLocaleString('en-US')+' sold on TCGplayer in the last 90 days.' : '.');
+    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold.toLocaleString('en-US')+' sold on TCGplayer in that time.' : '.');
   $('showSpark').innerHTML = sparkSvg(st.pts, up || st.change==null ? '#C8F23C' : '#FF6A55');
   const rows = $('showRows'); rows.textContent = '';
   const row = (k, v, cls)=>{ const d = document.createElement('div'); const a = document.createElement('span'); a.textContent = k; const b = document.createElement('span'); b.textContent = v; if(cls) b.className = cls; d.append(a, b); rows.append(d); };
-  if(st.lo!=null) row(st.trimmed ? 'Range '+st.period : '90-day range', money(fromUsd(st.lo))+' – '+money(fromUsd(st.hi)));
+  if(st.lo!=null) row(st.trimmed ? 'Range '+st.period : st.periodCap.charAt(0)+st.periodCap.slice(1).toLowerCase()+' range', money(fromUsd(st.lo))+' – '+money(fromUsd(st.hi)));
   if(st.sales[0]) row('Last sold', money(fromUsd(st.sales[0].p))+' · '+(COND[st.sales[0].cond]||st.sales[0].cond)+' · '+shortDate(st.sales[0].d));
   if(st.graded) row(show.grade+' value (yours)', money(st.graded));
   if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); row('You paid'+(show.where ? ' ('+show.where+')' : ''), money(st.paid));
@@ -2659,7 +2705,8 @@ function updateShow(){
   if(st.sales.length){ const h = document.createElement('div'); h.className = 'h'; h.textContent = 'Recent sales on TCGplayer'; sl.append(h);
     st.sales.forEach(x=>{ const r = document.createElement('div'); r.className = 's'; const a = document.createElement('span'); a.textContent = shortDate(x.d)+' · '+(COND[x.cond]||x.cond)+(x.q>1?' · ×'+x.q:''); const b = document.createElement('b'); b.textContent = money(fromUsd(x.p)); r.append(a, b); sl.append(r); }); }
   clearTimeout(tShow);
-  tShow = setTimeout(()=>{ const cv = drawShowcase(st); if(cv){ const fresh = $('showImg').dataset.id != it.id; $('showImg').src = cv.toDataURL('image/jpeg', 0.9); $('showImg').dataset.id = it.id; if(fresh) replay($('showImg'), 'develop'); } }, 150);
+  $('showEyebrow').textContent = st.watch ? 'Price watch · square, sized for posts' : 'Card spotlight · sized for posts';
+  tShow = setTimeout(()=>{ const cv = st.watch ? drawPriceWatch(st) : drawShowcase(st); if(cv){ const fresh = $('showImg').dataset.id != it.id; $('showImg').src = cv.toDataURL('image/jpeg', 0.9); $('showImg').dataset.id = it.id; if(fresh) replay($('showImg'), 'develop'); } }, 150);
 }
 // The card's own colour, for the light behind it.
 const tintCache = new Map();
@@ -2742,7 +2789,7 @@ function spotTicker(K){
   const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
   const chg = st.change==null ? null : Math.abs(st.change*100);
   const showG = chg==null && st.graded;
-  spotLabel(ctx, chg!=null ? (st.trimmed ? 'CHANGE '+st.periodCap : '90-DAY CHANGE') : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
+  spotLabel(ctx, chg!=null ? (st.trimmed ? 'CHANGE '+st.periodCap : st.periodCap+' CHANGE') : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
   const big = chg!=null ? (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%' : showG ? m(st.graded, 0) : st.market!=null ? m(fromUsd(st.market)) : '—';
   spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
   if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
@@ -2754,7 +2801,7 @@ function spotTicker(K){
   // three facts
   const facts = [];
   if(st.sales[0]) facts.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), (COND[st.sales[0].cond]||'')+' · '+shortDate(st.sales[0].d)]);
-  if(st.lo!=null) facts.push([st.trimmed ? 'RANGE '+st.periodCap : '90-DAY RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
+  if(st.lo!=null) facts.push([st.trimmed ? 'RANGE '+st.periodCap : st.periodCap+' RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
   if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); facts.push(['I PAID', m(st.paid), ref ? (ref >= st.paid ? '+' : '−')+m(Math.abs(ref - st.paid), 0)+' since'+(show.where ? ' · '+show.where : '') : (show.where||'')]); }
   else if(st.graded) facts.push([show.grade.toUpperCase()+' VALUE', m(st.graded), 'self-reported']);
   ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(52, 1200, 976, 1);
@@ -2765,18 +2812,96 @@ function spotTicker(K){
     ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1292); });
 }
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
+// The picture for the share image: your own photo if you added one, otherwise the card from TCGplayer.
+function showArt(it){ return showPhoto && showPhotoImg.complete && showPhotoImg.naturalWidth ? {img: showPhotoImg, photo: true} : productArt(it.id, false); }
+function compactMoney(v){ const a = Math.abs(v); return a >= 1e6 ? '$'+(v/1e6).toFixed(a >= 1e7 ? 0 : 1)+'M' : a >= 1e4 ? '$'+(v/1e3).toFixed(a >= 1e5 ? 0 : 1)+'K' : money(v, a >= 100 ? 0 : 2); }
+// Price watch: square post about how a card's price moved. Picture left, chart right, then / change / now underneath.
+function drawPriceWatch(st){
+  if(!bcFonts()) return null;
+  const it = st.it, W = 1080, H = 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), rnd = bcRand(it.id % 100000 + 11), INK = '#F4F1EA', soft = 'rgba(242,239,232,.62)', faint = 'rgba(242,239,232,.4)';
+  const art = showArt(it), artKey = showPhoto ? 'photo' : it.id, [cA] = art ? artPalette(art.img, artKey) : ['#C8F23C'];
+  const has = st.pts.length >= 2, startV = has ? st.pts[0][1] : null, nowV = st.market!=null ? st.market : has ? st.pts[st.pts.length-1][1] : null;
+  const up = st.change==null || st.change >= 0, trend = up ? '#3BE38A' : '#FF5A4E';
+  // backdrop
+  ctx.fillStyle = '#07070A'; ctx.fillRect(0, 0, W, H);
+  if(art){ const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(W/iw, H/ih)*1.2;
+    ctx.drawImage(softBackdrop(im, artKey), (W - iw*k)/2, (H - ih*k)/2, iw*k, ih*k); }
+  const fade = ctx.createLinearGradient(0, 0, 0, H); fade.addColorStop(0, 'rgba(7,7,10,.55)'); fade.addColorStop(.6, 'rgba(7,7,10,.7)'); fade.addColorStop(1, 'rgba(7,7,10,.95)'); ctx.fillStyle = fade; ctx.fillRect(0, 0, W, H);
+  // header
+  ctx.textBaseline = 'alphabetic';
+  if(brandIcon.complete && brandIcon.naturalWidth) ctx.drawImage(brandIcon, 44, 30, 50, 50);
+  ctx.font = '400 30px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', 104, 66); spaced(ctx, 0);
+  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = trend; ctx.fillText('PRICE WATCH', 106, 84); spaced(ctx, 0);
+  if(creatorOn()) drawCreator(ctx, W - 44, 32, 46, {align: 'right', font: '700 23px Archivo', ring: cA});
+  // picture, left
+  const PX = 44, PY = 112, PW = 400, PH = 560;
+  if(art){ const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(PW/iw, PH/ih), w = iw*k, h = ih*k, x = PX + (PW - w)/2, y = PY + (PH - h)/2, r = art.photo ? 14 : w*0.045;
+    ctx.save(); ctx.shadowColor = hexA(cA, .5); ctx.shadowBlur = 80; rrect(ctx, x, y, w, h, r); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 36; ctx.shadowOffsetY = 18; rrect(ctx, x, y, w, h, r); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    ctx.save(); rrect(ctx, x, y, w, h, r); ctx.clip(); ctx.drawImage(im, x, y, w, h); ctx.restore(); }
+  // chart panel, right
+  const CX0 = 470, CY0 = 112, CW = W - 44 - CX0, CH = 560;
+  rrect(ctx, CX0, CY0, CW, CH, 26); ctx.fillStyle = 'rgba(6,6,9,.72)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
+  const gx0 = CX0 + 92, gx1 = CX0 + CW - 40, gy0 = CY0 + 90, gy1 = CY0 + CH - 70;
+  if(has){
+    const pts = st.pts, ys = pts.map(p=>p[1]); let lo = Math.min(...ys), hi = Math.max(...ys); const span = (hi - lo) || hi*0.1 || 1; lo = Math.max(0, lo - span*0.12); hi = hi + span*0.12;
+    const X = i => gx0 + i/(pts.length-1)*(gx1 - gx0), Y = v => gy1 - (v - lo)/(hi - lo)*(gy1 - gy0);
+    // y ticks
+    ctx.font = '600 15px "Barlow Semi Condensed"'; ctx.textAlign = 'right';
+    for(let k=0;k<4;k++){ const v = lo + (hi - lo)*k/3, y = Y(v); ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(gx0, Math.round(y), gx1 - gx0, 1); ctx.fillStyle = faint; ctx.fillText(compactMoney(fromUsd(v)), gx0 - 14, y + 5); }
+    ctx.textAlign = 'left';
+    // month ticks
+    ctx.font = '700 15px "Barlow Semi Condensed"'; ctx.fillStyle = soft; ctx.textAlign = 'center'; let lastM = '', lastX = -99;
+    pts.forEach((p,i)=>{ const mo = p[0].slice(0, 7); if(mo !== lastM){ const x = X(i); if(lastM && x - lastX > 44 && x < gx1 - 10){ ctx.fillText(new Date(p[0]+'T00:00:00Z').toLocaleDateString('en-AU', {month: 'short', timeZone: 'UTC'}).toUpperCase(), x, gy1 + 34); lastX = x; } lastM = mo; } });
+    ctx.textAlign = 'left';
+    const P = pts.map((p,i)=>[X(i), Y(p[1])]);
+    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineTo(gx1, gy1); ctx.lineTo(gx0, gy1); ctx.closePath(); const f = ctx.createLinearGradient(0, gy0, 0, gy1); f.addColorStop(0, hexA(trend, .22)); f.addColorStop(1, hexA(trend, 0)); ctx.fillStyle = f; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = trend; ctx.shadowColor = hexA(trend, .7); ctx.shadowBlur = 16; ctx.stroke(); ctx.restore();
+    const dot = (q)=>{ ctx.beginPath(); ctx.arc(q[0], q[1], 11, 0, Math.PI*2); ctx.fillStyle = trend; ctx.fill(); ctx.beginPath(); ctx.arc(q[0], q[1], 4, 0, Math.PI*2); ctx.fillStyle = '#07070A'; ctx.fill(); };
+    const a = P[0], b = P[P.length-1];
+    dot(a); dot(b);
+    const tagAt = (q, v, d, align)=>{ const above = q[1] - 58 > gy0 - 40; const y = above ? q[1] - 40 : q[1] + 42;
+      ctx.textAlign = align; ctx.font = '700 26px "Barlow Semi Condensed"'; ctx.fillStyle = trend; ctx.fillText(compactMoney(fromUsd(v)), q[0], y);
+      ctx.font = '700 15px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(d, q[0], y + 20); ctx.textAlign = 'left'; };
+    tagAt(a, startV, shortDate(st.pts[0][0]), 'left'); tagAt(b, nowV, 'TODAY', 'right');
+  } else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.textAlign = 'center'; ctx.fillText(st.loading ? 'Loading price history…' : 'No TCGplayer sales in this period.', CX0 + CW/2, CY0 + CH/2); ctx.textAlign = 'left'; }
+  // name
+  let fs = 40; ctx.font = '800 '+fs+'px Archivo'; while(ctx.measureText(it.name).width > W - 88 && fs > 26){ fs -= 2; ctx.font = '800 '+fs+'px Archivo'; }
+  ctx.fillStyle = INK; ctx.fillText(it.name, 44, 732);
+  let meta = [shortSet(it.set), it.number ? '#'+it.number : '', rarAbbr(it.rarity), LANGN[it.lang]].filter(Boolean).join('  ·  ').toUpperCase();
+  ctx.font = '600 14px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = soft; ctx.fillText(clip(ctx, meta, W - 88), 44, 762); spaced(ctx, 0);
+  // then / change / now
+  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(44, 790, W - 88, 1); ctx.fillRect(44, 1000, W - 88, 1);
+  const cw = (W - 88)/3, mid = i => 44 + cw*i + cw/2;
+  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(44 + cw, 812, 1, 168); ctx.fillRect(44 + cw*2, 812, 1, 168);
+  const col = (i, lab, val, valCol, note)=>{ ctx.textAlign = 'center'; ctx.font = '600 22px "Barlow Semi Condensed"'; spaced(ctx, 2); ctx.fillStyle = INK; ctx.fillText(lab, mid(i), 846); spaced(ctx, 0);
+    if(val === '—'){ val = 'No sales'; valCol = faint; }
+    let vs = val === 'No sales' ? 40 : 76; ctx.font = '800 '+vs+'px Archivo'; while(ctx.measureText(val).width > cw - 24 && vs > 36){ vs -= 2; ctx.font = '800 '+vs+'px Archivo'; }
+    ctx.fillStyle = valCol; ctx.fillText(val, mid(i), val === 'No sales' ? 915 : 930); ctx.font = '600 17px "Barlow Semi Condensed"'; ctx.fillStyle = soft; ctx.fillText(note, mid(i), 966); ctx.textAlign = 'left'; };
+  const lime = '#C8F23C';
+  col(0, st.agoCap, startV!=null ? m2(fromUsd(startV)) : '—', lime, has ? shortDate(st.pts[0][0]) : '');
+  col(1, 'PRICE CHANGE', st.change==null ? '—' : (up ? '▲' : '▼')+Math.abs(st.change*100).toFixed(1)+'%', trend, st.sold ? st.sold.toLocaleString('en-US')+' sold' : '');
+  col(2, 'TODAY', nowV!=null ? m2(fromUsd(nowV)) : '—', lime, 'TCGplayer market');
+  function m2(v){ return money(v, v >= 100 ? 0 : 2); }
+  // footer
+  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText(((it.lang==='cn' ? 'CARDOS SOLD PRICES' : 'TCGPLAYER MARKET DATA')+'  ·  '+cur+'  ·  '+today).toUpperCase(), 44, H - 32);
+  ctx.textAlign = 'right'; ctx.fillText('POKESNIPR.COM', W - 44, H - 32); ctx.textAlign = 'left'; spaced(ctx, 0);
+  grainVignette(ctx, rnd, .02, .35);
+  return cv;
+}
 function drawShowcase(st){
   if(!bcFonts()) return null;
   const it = st.it, W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d'), rnd = bcRand(it.id % 100000 + 3), soft = 'rgba(242,239,232,.62)', faint = 'rgba(242,239,232,.38)', INK = '#F4F1EA';
-  const art = productArt(it.id, false), [cA, cB] = art ? artPalette(art.img, it.id) : ['#C8F23C', '#7C6CFF'];
+  const art = showArt(it), artKey = showPhoto ? 'photo' : it.id, [cA, cB] = art ? artPalette(art.img, artKey) : ['#C8F23C', '#7C6CFF'];
   const up = st.change==null || st.change >= 0, trend = up ? '#7BE495' : '#FF6A55';
   const m = (v, d) => v==null ? '—' : money(v, d!=null ? d : v >= 1000 ? 0 : 2);
   // ---- backdrop: the card's own art, blown up and blurred into light ----
   ctx.fillStyle = '#07070A'; ctx.fillRect(0, 0, W, H);
   if(art){
     const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(W/iw, H/ih)*1.25;
-    ctx.drawImage(softBackdrop(im, it.id), (W - iw*k)/2, (H - ih*k)/2 - 120, iw*k, ih*k);
+    ctx.drawImage(softBackdrop(im, artKey), (W - iw*k)/2, (H - ih*k)/2 - 120, iw*k, ih*k);
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   blob(ctx, 200, 260, 520, hexA(cA, .22)); blob(ctx, 900, 560, 560, hexA(cB, .2)); ctx.restore();
@@ -2855,11 +2980,14 @@ function drawShowcase(st){
   grainVignette(ctx, rnd, .022, .4);
   return cv;
 }
-$('saveShow').addEventListener('click', ()=>{ const st = showStats(); if(!st) return; const cv = drawShowcase(st); if(cv) save(cv, 'card-spotlight-'+st.it.id+'.jpg', $('statusShow'), 'image/jpeg'); });
+$('saveShow').addEventListener('click', ()=>{ const st = showStats(); if(!st) return; const cv = st.watch ? drawPriceWatch(st) : drawShowcase(st); if(cv) save(cv, (st.watch ? 'price-watch-' : 'card-spotlight-')+st.it.id+'.jpg', $('statusShow'), 'image/jpeg'); });
 $('copyShow').addEventListener('click', ()=>{
   const st = showStats(); if(!st) return; const it = st.it;
-  const cap = it.name+' ('+shortSet(it.set)+(it.number ? ' #'+it.number : '')+')'+(show.grade !== 'Raw' ? ' · '+show.grade : '')
-    +(st.market!=null ? ' · Market '+money(fromUsd(st.market)) : '')+(st.change!=null ? ' · '+(st.change>=0?'+':'-')+Math.abs(st.change*100).toFixed(1)+'% in 90 days' : '')
+  const tag = GAMES[it.game==='onepiece' ? 'onepiece' : 'pokemon'].tag;
+  const cap = st.watch
+    ? it.name+' ('+shortSet(it.set)+(it.number ? ' #'+it.number : '')+')'+(st.change!=null ? (st.change>=0 ? ' is up ' : ' is down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period+': '+money(fromUsd(st.pts[0][1]))+' → '+money(fromUsd(st.market!=null ? st.market : st.pts[st.pts.length-1][1])) : ' · Market '+money(fromUsd(st.market||0)))+'. '+tag+' #breakcheck pokesnipr.com'
+    : it.name+' ('+shortSet(it.set)+(it.number ? ' #'+it.number : '')+')'+(show.grade !== 'Raw' ? ' · '+show.grade : '')
+    +(st.market!=null ? ' · Market '+money(fromUsd(st.market)) : '')+(st.change!=null ? ' · '+(st.change>=0?'+':'-')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : '')
     +(st.paid ? ' · Paid '+money(st.paid)+(show.where ? ' on '+show.where : '') : '')+' · '+GAMES[it.game==='onepiece' ? 'onepiece' : 'pokemon'].tag+' #breakcheck pokesnipr.com';
   const done = ()=>{ $('statusShow').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusShow').textContent = cap; };
   try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
