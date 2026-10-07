@@ -2892,12 +2892,13 @@ function spotFit(ctx, txt, font, size, maxW, min){ let fs = size; ctx.font = fon
 function spotTicker(K){
   const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
   const chg = st.change==null ? null : Math.abs(st.change*100);
-  spotLabel(ctx, chg==null ? 'MARKET PRICE' : '90-DAY CHANGE', 52, 952, faint);
-  const big = chg==null ? (st.market!=null ? m(fromUsd(st.market)) : 'NO DATA') : (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%';
+  const showG = chg==null && st.graded;
+  spotLabel(ctx, chg!=null ? '90-DAY CHANGE' : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
+  const big = chg!=null ? (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%' : showG ? m(st.graded, 0) : st.market!=null ? m(fromUsd(st.market)) : '—';
   spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
   if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
     const a = m(fromUsd(st.pts[0][1])), b = m(st.market!=null ? fromUsd(st.market) : fromUsd(st.pts[st.pts.length-1][1])); ctx.fillText(a+'  →  '+b, 52, 1148); }
-  ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : 'TCGplayer market price', 52, 1178);
+  ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : showG ? 'Graded value, self-reported' : 'TCGplayer market price', 52, 1178);
   if(st.pts.length >= 2){ spotSpark(ctx, st.pts, 470, 950, 1024, 1150, cA, {start: true, fillDrop: 40});
     ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; ctx.fillText(shortDate(st.pts[0][0]), 470, 1186); ctx.textAlign = 'right'; ctx.fillText('TODAY', 1024, 1186); ctx.textAlign = 'left'; spaced(ctx, 0); }
   else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer sales in the last 90 days.', 470, 1060); }
