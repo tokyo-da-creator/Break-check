@@ -893,7 +893,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791346820';
+(function(){ var BUILD='1791348506';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3099,6 +3099,21 @@ function monoPath(ctx, P){
   ctx.moveTo(P[0][0], P[0][1]);
   for(let i=0;i<n-1;i++){ const h = dx[i]/3; ctx.bezierCurveTo(P[i][0]+h, P[i][1]+t[i]*h, P[i+1][0]-h, P[i+1][1]-t[i+1]*h, P[i+1][0], P[i+1][1]); }
 }
+// A heavily blurred, richer copy of the art for the backdrop. Built by shrinking to a few pixels and letting the
+// browser smooth it back up, because canvas blur filters don't work on iPhone Safari.
+const softCache = new Map();
+function softBackdrop(im, key){
+  if(softCache.has(key)) return softCache.get(key);
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, tw = 14, th = Math.max(8, Math.round(14*ih/iw));
+  const t = document.createElement('canvas'); t.width = tw; t.height = th; const tk = t.getContext('2d', {willReadFrequently: true});
+  tk.imageSmoothingQuality = 'high'; tk.drawImage(im, 0, 0, tw, th);
+  const d = tk.getImageData(0, 0, tw, th), px = d.data;
+  for(let i=0;i<px.length;i+=4){ const avg = (px[i]+px[i+1]+px[i+2])/3; for(let c=0;c<3;c++) px[i+c] = Math.max(0, Math.min(255, (avg + (px[i+c]-avg)*1.6)*0.72)); }
+  tk.putImageData(d, 0, 0);
+  // two smooth upscales so no blocks show
+  let src = t; [[tw*6, th*6], [tw*30, th*30]].forEach(([w, h])=>{ const c = document.createElement('canvas'); c.width = w; c.height = h; const k = c.getContext('2d'); k.imageSmoothingEnabled = true; k.imageSmoothingQuality = 'high'; k.drawImage(src, 0, 0, w, h); src = c; });
+  softCache.set(key, src); return src;
+}
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
 function drawShowcase(st){
   if(!bcFonts()) return null;
@@ -3111,7 +3126,7 @@ function drawShowcase(st){
   ctx.fillStyle = '#07070A'; ctx.fillRect(0, 0, W, H);
   if(art){
     const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(W/iw, H/ih)*1.25;
-    ctx.save(); ctx.filter = 'blur(70px) saturate(1.5) brightness(.75)'; ctx.drawImage(im, (W - iw*k)/2, (H - ih*k)/2 - 120, iw*k, ih*k); ctx.restore();
+    ctx.drawImage(softBackdrop(im, it.id), (W - iw*k)/2, (H - ih*k)/2 - 120, iw*k, ih*k);
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   blob(ctx, 200, 260, 520, hexA(cA, .22)); blob(ctx, 900, 560, 560, hexA(cB, .2)); ctx.restore();
