@@ -25,7 +25,7 @@ mode = os.environ.get("MOVERS_MODE", "carry")
 if mode != "full" and carry_over():
     try: n_live = len(json.load(open(OUT))["rows"])
     except Exception: n_live = 0
-    if n_live >= 3000: sys.exit(0)
+    if n_live >= 6000: sys.exit(0)
     print("movers: live file is thin (", n_live, "rows), rebuilding")
 
 def vfull(v):
@@ -84,16 +84,36 @@ def work(pid):
         out.append([pid, variant, round(now, 2), round(p7, 2) if p7 else None, round(p30, 2), sold7, sold30, game])
     return pid, out
 
-rows, done, t0, failed = [], 0, time.time(), 0
-with cf.ThreadPoolExecutor(int(os.environ.get('MOVERS_THREADS', '4'))) as ex:
-    futs = {ex.submit(work, pid): pid for pid in want}
-    for f in cf.as_completed(futs):
-        pid, r = f.result(); done += 1
-        if not r: failed += 1
-        rows.extend(r)
-        if done % 500 == 0: print("movers:", done, "/", len(want), "rows", len(rows), "secs", round(time.time() - t0))
-        if time.time() - t0 > BUDGET:
-            print("movers: time budget reached at", done); ex.shutdown(wait=False, cancel_futures=True); break
+# yesterday's rows, kept for any card TCGplayer doesn't answer for this time
+prev = {}
+try:
+    for r in json.load(urllib.request.urlopen(urllib.request.Request(LIVE, headers={"User-Agent": H["User-Agent"]}), timeout=60)).get("rows", []):
+        prev.setdefault(r[0], []).append(r)
+except Exception: pass
+
+rows, t0 = [], time.time()
+def run(pids, threads, label):
+    got, missed = [], []
+    with cf.ThreadPoolExecutor(threads) as ex:
+        futs = {ex.submit(work, pid): pid for pid in pids}
+        for n, f in enumerate(cf.as_completed(futs), 1):
+            pid, r = f.result()
+            (got.extend(r) if r else missed.append(pid))
+            if n % 1000 == 0: print("movers:", label, n, "/", len(pids), "rows", len(got), "secs", round(time.time() - t0))
+            if time.time() - t0 > BUDGET:
+                print("movers: time budget reached"); ex.shutdown(wait=False, cancel_futures=True)
+                missed.extend(p for p in pids if p not in {futs[x] for x in futs if x.done()}); break
+    return got, missed
+got, missed = run(list(want), int(os.environ.get("MOVERS_THREADS", "4")), "pass 1")
+rows.extend(got)
+if missed and time.time() - t0 < BUDGET - 120:
+    print("movers: retrying", len(missed), "after a pause"); time.sleep(60)
+    got, missed = run(missed, 2, "pass 2"); rows.extend(got)
+kept = 0
+for pid in missed:
+    if pid in prev: rows.extend(prev[pid]); kept += 1
+done, failed = len(want), len(missed)
+print("movers: kept yesterday's numbers for", kept, "cards")
 
 if len(rows) < 200:
     print("movers: too few rows (", len(rows), "), keeping the live file"); carry_over(); sys.exit(0)
