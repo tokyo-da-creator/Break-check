@@ -893,7 +893,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791372374';
+(function(){ var BUILD='1791374484';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -2837,7 +2837,19 @@ function showStats(){
     const sc = x => (x.variant===vf ? 4 : 0) + (/near mint|unopened/i.test(x.condition) ? 2 : 0) + (x.language===lang ? 1 : 0);
     series = data.series.slice().sort((a,b)=>sc(b)-sc(a) || b.sold-a.sold)[0];
   }
-  const pts = series ? series.points : [];
+  let pts = series ? series.points : [];
+  // New cards: before a card really trades, TCGplayer carries one early (often pre-order) sale forward for weeks,
+  // and its rolling market price lags the first big week of real sales. Start where trading actually begins.
+  let trimmed = false;
+  if(pts.length > 4){
+    const vols = pts.map(p=>p[2]).filter(v=>v > 0).sort((a,b)=>a-b), med = vols.length ? vols[Math.floor(vols.length/2)] : 0, need = Math.max(2, Math.ceil(med*0.25));
+    // only for cards that trade in volume now but barely traded at the start (a fresh release)
+    const k = med >= 10 ? pts.findIndex(p=>p[2] >= need) : -1;
+    if(k >= 2){ pts = pts.slice(k); trimmed = true;
+      while(pts.length > 3 && pts[0][1] > pts[1][1]*1.8 && pts[1][2] >= need) pts = pts.slice(1); }
+  }
+  const period = trimmed ? 'since '+shortDate(pts[0][0]).toLowerCase().replace(/\b\w/g, c=>c.toUpperCase()) : 'over 90 days';
+  const periodCap = trimmed ? 'SINCE '+shortDate(pts[0][0]) : '90-DAY';
   const market = it.usd!=null ? it.usd : pts.length ? pts[pts.length-1][1] : null;
   const first = pts.length ? pts[0][1] : null;
   const change = market!=null && first ? market/first - 1 : null;
@@ -2848,7 +2860,7 @@ function showStats(){
   sales = sales.slice(0, 5);
   const lows = pts.map(p=>p[1]), lo = lows.length ? Math.min(...lows) : null, hi = lows.length ? Math.max(...lows) : null;
   const paid = num(show.paid), graded = show.grade!=='Raw' ? num(show.graded) : NaN;
-  return {it, data, loading: data===null || (data===undefined && it.lang!=='cn'), pts, market, change, sold, sales, lo, hi,
+  return {it, data, loading: data===null || (data===undefined && it.lang!=='cn'), pts, market, change, sold, sales, lo, hi, period, periodCap, trimmed,
     paid: paid>0 ? paid : null, graded: graded>0 ? graded : null};
 }
 const shortDate = d => { const t = new Date(d+'T00:00:00Z'); return isNaN(t) ? d : t.toLocaleDateString('en-AU', {day:'numeric', month:'short', timeZone:'UTC'}).toUpperCase(); };
@@ -2878,11 +2890,11 @@ function updateShow(){
   const up = st.change!=null && st.change >= 0;
   $('showBig').textContent = st.market!=null ? money(fromUsd(st.market)) : 'No price yet'; $('showBig').style.color = 'var(--fg)';
   $('showLine').textContent = st.loading ? 'Getting 90 days of sales from TCGplayer…'
-    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% over 90 days' : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold+' sold on TCGplayer in that time.' : '.');
+    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold.toLocaleString('en-US')+' sold on TCGplayer in the last 90 days.' : '.');
   $('showSpark').innerHTML = sparkSvg(st.pts, up || st.change==null ? '#C8F23C' : '#FF6A55');
   const rows = $('showRows'); rows.textContent = '';
   const row = (k, v, cls)=>{ const d = document.createElement('div'); const a = document.createElement('span'); a.textContent = k; const b = document.createElement('span'); b.textContent = v; if(cls) b.className = cls; d.append(a, b); rows.append(d); };
-  if(st.lo!=null) row('90-day range', money(fromUsd(st.lo))+' – '+money(fromUsd(st.hi)));
+  if(st.lo!=null) row(st.trimmed ? 'Range '+st.period : '90-day range', money(fromUsd(st.lo))+' – '+money(fromUsd(st.hi)));
   if(st.sales[0]) row('Last sold', money(fromUsd(st.sales[0].p))+' · '+(COND[st.sales[0].cond]||st.sales[0].cond)+' · '+shortDate(st.sales[0].d));
   if(st.graded) row(show.grade+' value (yours)', money(st.graded));
   if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); row('You paid'+(show.where ? ' ('+show.where+')' : ''), money(st.paid));
@@ -2974,7 +2986,7 @@ function spotTicker(K){
   const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
   const chg = st.change==null ? null : Math.abs(st.change*100);
   const showG = chg==null && st.graded;
-  spotLabel(ctx, chg!=null ? '90-DAY CHANGE' : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
+  spotLabel(ctx, chg!=null ? (st.trimmed ? 'CHANGE '+st.periodCap : '90-DAY CHANGE') : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
   const big = chg!=null ? (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%' : showG ? m(st.graded, 0) : st.market!=null ? m(fromUsd(st.market)) : '—';
   spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
   if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
@@ -2986,7 +2998,7 @@ function spotTicker(K){
   // three facts
   const facts = [];
   if(st.sales[0]) facts.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), (COND[st.sales[0].cond]||'')+' · '+shortDate(st.sales[0].d)]);
-  if(st.lo!=null) facts.push(['90-DAY RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
+  if(st.lo!=null) facts.push([st.trimmed ? 'RANGE '+st.periodCap : '90-DAY RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
   if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); facts.push(['I PAID', m(st.paid), ref ? (ref >= st.paid ? '+' : '−')+m(Math.abs(ref - st.paid), 0)+' since'+(show.where ? ' · '+show.where : '') : (show.where||'')]); }
   else if(st.graded) facts.push([show.grade.toUpperCase()+' VALUE', m(st.graded), 'self-reported']);
   ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(52, 1200, 976, 1);
