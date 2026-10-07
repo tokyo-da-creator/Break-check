@@ -17,7 +17,7 @@ concurrency: refresh-prices
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +32,12 @@ jobs:
         # If this fails the last good One Piece catalog in the repo is published, and Pokémon still updates.
         continue-on-error: true
         run: python scripts/build_onepiece.py
+      - name: Build movers (week / month price changes)
+        # Full refresh on the daily schedule; other runs reuse the live file (or build it if it's missing).
+        continue-on-error: true
+        env:
+          MOVERS_MODE: ${{ github.event_name == 'schedule' && 'full' || 'carry' }}
+        run: python scripts/build_movers.py
       - name: Build page
         run: python scripts/build_site.py
       - name: Deploy to Cloudflare
