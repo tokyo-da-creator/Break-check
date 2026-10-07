@@ -13,6 +13,7 @@ Pokémon and One Piece TCG price and break checker. Check a price before you buy
 | Server | `src/worker.js` | Cloudflare Worker: live prices (`/api/live`), FX (`/api/fx`), product images (`/img/:id/:size`), share links (`/api/share`, `/i/:id`, `/r/:id`), redirects to pokesnipr.com. |
 | Static files | `public/` | Built page, catalog, icons, card art, privacy/terms pages, app manifest. |
 | One Piece catalog | `scripts/build_onepiece.py` | Daily: every English One Piece single and sealed product with TCGplayer prices → `public/catalog-onepiece.json`. The app loads it only when someone switches to One Piece. |
+| Movers | `scripts/build_movers.py` | Daily: 7-day and 30-day near-mint price change and sales count for every card worth $20+, from TCGplayer's price history (fetched through the site's Worker) → `public/movers.json`. Powers Top lists. |
 | Price catalog | `scripts/build_catalog.py` | Daily: every English and Japanese single and sealed product with TCGplayer prices; Chinese from PriceCharting when `PRICECHARTING_TOKEN` is set. |
 | Page build | `scripts/build_site.py` | Injects `site/search.js` into `site/index.html` → `public/index.html`, writes `public/version.json`. |
 | Card art | `cards/` | Source images and scripts that make the BREAK card / receipt plates in `public/cards/v3/`. |
