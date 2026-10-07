@@ -893,7 +893,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791370750';
+(function(){ var BUILD='1791372374';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -1130,161 +1130,6 @@ function productArt(id, sealed){
   return e.ready ? e : null;
 }
 function rrect(ctx, x, y, w, h, r){ ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
-// Display slab, like a graded-card case. The "grade" is the Break Check result (HIT, W, STEAL, RIPOFF...),
-// with a cert number + barcode, market value, and a holo seal when every price is verified. Nothing is cut out.
-function drawSlab(ctx, art, sealed, cx, cy, H, rot, glow, label){
-  const img = art.img, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-  const W = sealed ? H*1.0 : H*0.66, R = W*0.065, pad = W*0.055, lh = W*(sealed ? 0.36 : 0.44);
-  ctx.save();
-  if(glow){
-    const gr = Math.max(W,H)*0.9, g = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
-    g.addColorStop(0, glow); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(cx-gr, cy-gr, gr*2, gr*2);
-  }
-  ctx.translate(cx, cy); ctx.rotate((rot||0)*Math.PI/180);
-  const x = -W/2, y = -H/2;
-  // case: smoked acrylic, thick bevel, bright rim
-  ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 24;
-  rrect(ctx, x, y, W, H, R); ctx.fillStyle = '#121316'; ctx.fill(); ctx.shadowColor = 'transparent';
-  const body = ctx.createLinearGradient(x, y, x+W, y+H);
-  body.addColorStop(0, 'rgba(255,255,255,.20)'); body.addColorStop(0.45, 'rgba(255,255,255,.05)'); body.addColorStop(1, 'rgba(255,255,255,.14)');
-  rrect(ctx, x, y, W, H, R); ctx.fillStyle = body; ctx.fill();
-  rrect(ctx, x+W*0.022, y+W*0.022, W-W*0.044, H-W*0.044, R*0.75); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.stroke();
-  // label
-  const lx = x+pad, ly = y+pad, lw = W-2*pad;
-  rrect(ctx, lx, ly, lw, lh, R*0.4); ctx.fillStyle = '#F4F1EA'; ctx.fill();
-  ctx.save(); rrect(ctx, lx, ly, lw, lh, R*0.4); ctx.clip();
-  ctx.fillStyle = label.accent; ctx.fillRect(lx, ly, lw*0.03, lh);
-  // grade pill (right)
-  ctx.font = Math.round(lh*0.30)+'px Anton';
-  const gt = label.grade || '', gw = Math.max(ctx.measureText(gt).width + lh*0.28, lw*0.2), gh = lh*0.40, gx = lx+lw-gw-lw*0.04, gy = ly+lh*0.12;
-  ctx.font = '700 '+Math.round(lh*0.085)+'px "JetBrains Mono"'; ctx.fillStyle = '#6B6862'; ctx.textAlign = 'center';
-  ctx.fillText('BREAK GRADE', gx+gw/2, gy - lh*0.0 + gh + lh*0.13);
-  rrect(ctx, gx, gy, gw, gh, gh*0.18); ctx.fillStyle = label.accent; ctx.fill();
-  ctx.font = Math.round(lh*0.30)+'px Anton'; ctx.fillStyle = '#0B0B0C'; ctx.fillText(gt, gx+gw/2, gy+gh*0.80);
-  // name, set, market value (left)
-  const tx = lx+lw*0.08, tw = gx - tx - lw*0.04;
-  ctx.textAlign = 'left'; ctx.fillStyle = '#0B0B0C';
-  ctx.font = '800 '+Math.round(lh*0.135)+'px Archivo'; ctx.fillText(clip(ctx, label.title, tw), tx, ly+lh*0.25);
-  ctx.font = '500 '+Math.round(lh*0.095)+'px "JetBrains Mono"'; ctx.fillStyle = '#6B6862'; ctx.fillText(clip(ctx, label.sub, tw), tx, ly+lh*0.41);
-  ctx.font = '700 '+Math.round(lh*0.12)+'px "JetBrains Mono"'; ctx.fillStyle = '#0B0B0C'; ctx.fillText(clip(ctx, 'MKT '+label.value, tw), tx, ly+lh*0.60);
-  // barcode + cert number (bottom strip)
-  const by = ly+lh*0.74, bh = lh*0.14; let bx = tx, seed = 0;
-  for(const ch of String(label.cert||'0000')+'BC') seed = (seed*31 + ch.charCodeAt(0)) >>> 0;
-  ctx.fillStyle = '#0B0B0C';
-  while(bx < tx + lw*0.42){ seed = (seed*1103515245 + 12345) >>> 0; const bw = 1 + (seed>>>28)%3; ctx.fillRect(bx, by, bw*lw*0.0035, bh); bx += (bw+1+(seed>>>24)%2)*lw*0.0035; }
-  ctx.font = '700 '+Math.round(lh*0.085)+'px "JetBrains Mono"'; ctx.fillStyle = '#6B6862'; ctx.textAlign = 'left';
-  ctx.fillText('CERT #'+(label.cert||''), tx + lw*0.46, by + bh*0.85);
-  ctx.restore();
-  // window with the product
-  const wx = x+pad, wy = ly+lh+pad*0.8, ww = W-2*pad, wh = H - (wy - y) - pad;
-  ctx.save(); rrect(ctx, wx, wy, ww, wh, R*0.45); ctx.clip();
-  if(sealed){
-    const g = ctx.createRadialGradient(0, wy+wh*0.35, ww*0.05, 0, wy+wh*0.5, Math.max(ww,wh)*0.8);
-    g.addColorStop(0, '#FFFFFF'); g.addColorStop(0.6, '#F1EFEA'); g.addColorStop(1, '#D8D5CD');
-    ctx.fillStyle = g; ctx.fillRect(wx, wy, ww, wh);
-    const k = Math.min((ww*0.9)/iw, (wh*0.9)/ih), dw = iw*k, dh = ih*k;
-    ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(img, wx+(ww-dw)/2, wy+(wh-dh)/2, dw, dh);
-  } else {
-    const g = ctx.createLinearGradient(0, wy, 0, wy+wh); g.addColorStop(0, '#17181B'); g.addColorStop(1, '#0C0C0E');
-    ctx.fillStyle = g; ctx.fillRect(wx, wy, ww, wh);
-    const k = Math.min((ww*0.88)/iw, (wh*0.92)/ih), dw = iw*k, dh = ih*k, cxw = wx+(ww-dw)/2, cyw = wy+(wh-dh)/2;
-    ctx.save(); rrect(ctx, cxw, cyw, dw, dh, dw*0.05); ctx.clip(); ctx.drawImage(img, cxw, cyw, dw, dh); ctx.restore();
-  }
-  ctx.restore();
-  rrect(ctx, wx, wy, ww, wh, R*0.45); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
-  // holo seal on the label edge (only when every price is verified)
-  if(label.verified){
-    const sr = lh*0.17, sx = lx+lw*0.9, sy = ly+lh;
-    ctx.save(); ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI*2); ctx.clip();
-    const holo = ctx.createConicGradient ? ctx.createConicGradient(0.6, sx, sy) : ctx.createLinearGradient(sx-sr, sy-sr, sx+sr, sy+sr);
-    ['#FF8AD8','#FFD36E','#B6FF7A','#7CE7FF','#9C8CFF','#FF8AD8'].forEach((c,i,a)=>holo.addColorStop(i/(a.length-1), c));
-    ctx.fillStyle = holo; ctx.fillRect(sx-sr, sy-sr, sr*2, sr*2);
-    const shine = ctx.createRadialGradient(sx-sr*0.3, sy-sr*0.4, 0, sx, sy, sr); shine.addColorStop(0,'rgba(255,255,255,.75)'); shine.addColorStop(0.5,'rgba(255,255,255,.1)'); shine.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle = shine; ctx.fillRect(sx-sr, sy-sr, sr*2, sr*2); ctx.restore();
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI*2); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
-    ctx.font = '800 '+Math.round(sr*0.95)+'px Archivo'; ctx.fillStyle = 'rgba(11,11,12,.85)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('✓', sx, sy+sr*0.04); ctx.textBaseline = 'alphabetic';
-  }
-  // glass: rim light and one diagonal sheen
-  rrect(ctx, x+1, y+1, W-2, H-2, R); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.stroke();
-  ctx.save(); rrect(ctx, x, y, W, H, R); ctx.clip();
-  const sh = ctx.createLinearGradient(x, y, x+W, y+H*0.6);
-  sh.addColorStop(0.28, 'rgba(255,255,255,0)'); sh.addColorStop(0.40, 'rgba(255,255,255,.14)'); sh.addColorStop(0.47, 'rgba(255,255,255,0)');
-  sh.addColorStop(0.55, 'rgba(255,255,255,0)'); sh.addColorStop(0.58, 'rgba(255,255,255,.07)'); sh.addColorStop(0.61, 'rgba(255,255,255,0)');
-  ctx.fillStyle = sh; ctx.fillRect(x, y, W, H); ctx.restore();
-  ctx.restore();
-}
-// Valuation terminal for a sealed receipt: Break/Check's own price-check scanner.
-// Reads PAID → MARKET → +VALUE; the whole product is shown (never cropped), centred on its own edges. Laid out from measured
-// rows so spacing is even and the unit is centred on (cx, cy).
-function drawTerminal(ctx, art, d, cx, cy, W){
-  const img = art.img, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-  const up = d.r.net >= 0, acc = up ? C.win : C.loss, R = 24, pad = 20, iwid = W - 2*pad;
-  const spaced = px => { if('letterSpacing' in ctx) ctx.letterSpacing = px+'px'; };
-  // measure the name first (up to two lines), so the unit's height fits its content
-  const name = (d.sealedWhat || d.name || '').replace(/\s*\[.*?\]\s*/g, ' ').replace(/\s*\(.*?\)\s*/g, ' ').trim().toUpperCase();
-  ctx.save();
-  ctx.font = '600 11px Archivo'; spaced(1.6); const pillW = ctx.measureText('SEALED').width + 24, pillH = 24;
-  ctx.font = '800 13px Archivo'; spaced(1.2);
-  const maxW = iwid - pillW - 16, lines = [''];
-  name.split(/\s+/).forEach(w=>{ const cur = lines[lines.length-1], t = cur ? cur+' '+w : w; if(ctx.measureText(t).width <= maxW || !cur) lines[lines.length-1] = t; else lines.push(w); });
-  if(lines.length > 3){ lines.length = 3; lines[2] = clip(ctx, lines[2]+' …', maxW); }
-  const LH = 18, shH = Math.round(iwid*0.56);
-  // vertical rhythm (all offsets from the top edge)
-  const yHead = 34, yShot = 48, yName = yShot + shH + 30, nameBlock = (lines.length-1)*LH;
-  const yRule = yName + nameBlock + 20, yLab = yRule + 28, yVal = yLab + 34, yRes = yVal + 46, H = yRes + 26;
-  const x = cx - W/2, y = cy - H/2;
-  // housing
-  ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 24;
-  rrect(ctx, x, y, W, H, R); ctx.fillStyle = '#121214'; ctx.fill();
-  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  rrect(ctx, x+0.75, y+0.75, W-1.5, H-1.5, R); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.stroke();
-  const L = x + pad, Rt = x + W - pad;
-  // header
-  spaced(0); ctx.font = '800 14px Archivo'; ctx.textAlign = 'left'; ctx.fillStyle = C.fg;
-  ctx.fillText('BREAK', L, y+yHead); let wx = L + ctx.measureText('BREAK').width;
-  ctx.fillStyle = C.win; ctx.fillText('/', wx, y+yHead); wx += ctx.measureText('/').width;
-  ctx.fillStyle = C.fg; ctx.fillText('CHECK', wx, y+yHead);
-  ctx.font = '600 13px Archivo'; ctx.fillStyle = C.muted; ctx.textAlign = 'right'; ctx.fillText('#'+d.no, Rt, y+yHead); ctx.textAlign = 'left';
-  // screen: the whole product, centred, on a lit panel with one scan line
-  const sx = L, sy = y + yShot, sw = iwid;
-  ctx.save(); rrect(ctx, sx, sy, sw, shH, 14); ctx.clip();
-  const sg = ctx.createRadialGradient(sx+sw/2, sy+shH*0.4, 10, sx+sw/2, sy+shH*0.5, sw*0.75);
-  sg.addColorStop(0, '#FFFFFF'); sg.addColorStop(0.65, '#F2F0EB'); sg.addColorStop(1, '#DEDBD3');
-  ctx.fillStyle = sg; ctx.fillRect(sx, sy, sw, shH);
-  const k = Math.min((sw*0.84)/iw, (shH*0.82)/ih), dw = iw*k, dh = ih*k;   // equal margin on every side
-  ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(img, sx+(sw-dw)/2, sy+(shH-dh)/2, dw, dh); ctx.globalCompositeOperation = 'source-over';
-  ctx.restore();
-  // name + condition pill, pill centred on the name block
-  ctx.font = '800 13px Archivo'; spaced(1.2); ctx.fillStyle = C.fg;
-  lines.forEach((l,i)=>ctx.fillText(l, L, y + yName + i*LH));
-  const nameMid = y + yName - 5 + nameBlock/2, pillY = nameMid - pillH/2;
-  rrect(ctx, Rt-pillW, pillY, pillW, pillH, pillH/2); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(244,241,234,.35)'; ctx.stroke();
-  ctx.font = '600 11px Archivo'; spaced(1.6); ctx.fillStyle = C.fg; ctx.textAlign = 'center';
-  ctx.fillText('SEALED', Rt-pillW/2+0.8, pillY + pillH/2 + 4); ctx.textAlign = 'left';
-  // divider
-  ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(L, y + yRule, iwid, 1);
-  // PAID → MARKET: matched labels, matched values, arrow centred between them
-  ctx.font = '600 10px Archivo'; spaced(2); ctx.fillStyle = C.muted;
-  ctx.fillText('PAID', L, y + yLab); ctx.textAlign = 'right'; ctx.fillText('MARKET', Rt + 2, y + yLab); ctx.textAlign = 'left';
-  spaced(0); ctx.font = '800 32px Archivo'; ctx.fillStyle = C.fg;
-  ctx.fillText(money(d.spent, 0), L - 1, y + yVal);
-  ctx.textAlign = 'right'; ctx.fillText(money(d.r.pulled, 0), Rt, y + yVal); ctx.textAlign = 'left';
-  ctx.strokeStyle = C.win; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const ax = x + W/2, ay = y + yVal - 11;
-  ctx.beginPath(); ctx.moveTo(ax-10, ay); ctx.lineTo(ax+10, ay); ctx.moveTo(ax+4, ay-6); ctx.lineTo(ax+10, ay); ctx.lineTo(ax+4, ay+6); ctx.stroke();
-  // +VALUE and UPSIDE on one baseline
-  const val = (up?'+':'-') + money(Math.abs(Math.round(d.r.net)), 0);
-  ctx.font = '800 30px Archivo'; ctx.fillStyle = acc; ctx.fillText(val, L - 1, y + yRes);
-  const vw = ctx.measureText(val).width;
-  ctx.font = '600 10px Archivo'; spaced(2); ctx.fillStyle = C.muted; ctx.fillText(up ? 'VALUE' : 'UNDER', L + vw + 8, y + yRes);
-  const upTxt = Math.round(Math.abs(d.r.roi)*100)+'% '+(up ? 'UPSIDE' : 'DOWNSIDE');
-  ctx.textAlign = 'right'; ctx.font = '800 11px Archivo'; spaced(1.4); ctx.fillStyle = acc; ctx.fillText(upTxt, Rt + 1.4, y + yRes);
-  const uw = ctx.measureText(upTxt).width; spaced(0);
-  ctx.font = '600 13px Archivo'; ctx.fillStyle = d.v.ok ? C.muted : C.warn; ctx.fillText(d.v.ok ? '✓' : '!', Rt - uw - 6, y + yRes);
-  ctx.textAlign = 'left';
-  ctx.restore();
-}
 
 // What to show: the sealed product, or up to three top hits fanned out (best in front).
 function receiptArt(d){
@@ -1294,14 +1139,6 @@ function receiptArt(d){
   return (d.items||[]).filter(h=>!h.manual && h.id).slice(0,3).map(h=>({art: productArt(h.id, false), sealed:false,
     label:{title: h.name+(h.number?' '+h.number.split('/')[0]:''), sub: (versionOf(h.set)?versionOf(h.set).label+' · ':'')+shortSetName(h.set), value: money(h.value, 0),
       grade: rarAbbr(h.rarity) || 'HIT', cert: d.no, verified: isVerified(h)}})).filter(x=>x.art);
-}
-function paintFan(ctx, arts, cx, cy, h, glow, accent){
-  if(!arts.length) return;
-  const n = Math.min(arts.length, 3);
-  for(let i=n-1;i>=0;i--){                       // slabs behind first, best one in front
-    const off = i===0 ? 0 : (i===1 ? -1 : 1);
-    drawSlab(ctx, arts[i].art, arts[i].sealed, cx + off*h*0.2, cy + (i?h*0.03:0), i ? h*0.9 : h, off*9 - 3, i===n-1 ? glow : null, Object.assign({accent}, arts[i].label));
-  }
 }
 
 // Shared surfaces cut from the pack photo: crinkled black foil and the ribbed crimp seal.
@@ -3160,124 +2997,6 @@ function spotTicker(K){
     ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1292); });
 }
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
-// A graded slab: clear acrylic case, the grader's label on top, the card sealed inside.
-// Styled after each grader's look (PSA red frame, Beckett gold or black, CGC navy, TAG black) without copying their logos.
-function slabStyle(grade){
-  const g = grade.toUpperCase(), n = (g.match(/\d+(\.\d)?/)||[''])[0];
-  const word = /BLACK LABEL/.test(g) ? 'PRISTINE' : /PRISTINE/.test(g) ? 'PRISTINE' : n==='10' ? (/^PSA/.test(g) ? 'GEM MT' : 'GEM MINT') : n==='9.5' ? 'GEM MINT' : n==='9' ? 'MINT' : n==='8' ? 'NM-MT' : n==='7' ? 'NM' : 'GRADED';
-  if(/^PSA/.test(g)) return {co: 'PSA', n, word, bg: '#FBFAF7', ink: '#141414', frame: '#D0192B', badge: '#1F4E9C', badgeInk: '#fff'};
-  if(/^BGS/.test(g)) return /BLACK/.test(g) ? {co: 'BECKETT', n, word, bg: '#0E0E10', ink: '#F1F1F1', frame: '#2A2A2E', badge: '#F1F1F1', badgeInk: '#0E0E10', dark: true}
-                                          : {co: 'BECKETT', n, word, bg: '#121212', ink: '#E6C46A', frame: '#C9A227', badge: '#C9A227', badgeInk: '#121212', dark: true};
-  if(/^CGC/.test(g)) return {co: 'CGC', n, word, bg: '#F7F8FB', ink: '#16233F', frame: '#1B3A6B', badge: '#1B3A6B', badgeInk: '#fff'};
-  if(/^TAG/.test(g)) return {co: 'TAG', n, word, bg: '#0B0B0C', ink: '#F4F4F4', frame: '#3A3A3E', badge: '#F4F4F4', badgeInk: '#0B0B0C', dark: true};
-  return {co: 'GRADED', n, word, bg: '#F4F2EE', ink: '#151515', frame: '#555', badge: '#222', badgeInk: '#fff'};
-}
-function drawSlab(ctx, im, it, grade, cx, cy, H, ang, glow){
-  const S = slabStyle(grade), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const rim = 16, pad = 26, labH = H*0.205, gap = 22, cardH = H - labH - gap - pad*2 - 18, cardW = cardH*iw/ih, W2 = cardW + pad*2 + 18, x0 = -W2/2, y0 = -H/2, R = 18;
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-  // ---- the case ----
-  ctx.save(); ctx.shadowColor = hexA(glow, .55); ctx.shadowBlur = 110; rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fill(); ctx.restore();
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.75)'; ctx.shadowBlur = 55; ctx.shadowOffsetY = 30; rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = 'rgba(22,24,30,.35)'; ctx.fill(); ctx.restore();
-  // thick acrylic rim: lit from the top left
-  const rimG = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H);
-  rimG.addColorStop(0, 'rgba(255,255,255,.62)'); rimG.addColorStop(.35, 'rgba(210,220,235,.28)'); rimG.addColorStop(.65, 'rgba(160,170,190,.22)'); rimG.addColorStop(1, 'rgba(255,255,255,.45)');
-  rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = rimG; ctx.fill();
-  // inner body (slightly darker, the plastic you look through)
-  const bodyG = ctx.createLinearGradient(0, y0, 0, y0 + H); bodyG.addColorStop(0, 'rgba(70,76,90,.42)'); bodyG.addColorStop(1, 'rgba(20,22,28,.6)');
-  rrect(ctx, x0 + rim*0.55, y0 + rim*0.55, W2 - rim*1.1, H - rim*1.1, R - 6); ctx.fillStyle = bodyG; ctx.fill();
-  // bevel lines
-  rrect(ctx, x0 + 1.5, y0 + 1.5, W2 - 3, H - 3, R); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.stroke();
-  rrect(ctx, x0 + rim*0.55, y0 + rim*0.55, W2 - rim*1.1, H - rim*1.1, R - 6); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke();
-  rrect(ctx, x0 + rim*0.55 + 2, y0 + rim*0.55 + 2, W2 - rim*1.1 - 4, H - rim*1.1 - 4, R - 7); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
-  // ---- the label insert ----
-  const lx = x0 + pad, ly = y0 + pad, lw = W2 - pad*2;
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2; rrect(ctx, lx, ly, lw, labH, 4); ctx.fillStyle = S.bg; ctx.fill(); ctx.restore();
-  ctx.save(); rrect(ctx, lx, ly, lw, labH, 4); ctx.clip(); slabLabel(ctx, S, it, lx, ly, lw, labH); ctx.restore();
-  // ridge under the label
-  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(x0 + rim, ly + labH + gap/2, W2 - rim*2, 1.5);
-  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0 + rim, ly + labH + gap/2 + 1.5, W2 - rim*2, 1.5);
-  // ---- the card well ----
-  const wy = ly + labH + gap, wx = -cardW/2 - 9, ww = cardW + 18, wh = cardH + 18;
-  ctx.save(); rrect(ctx, wx, wy, ww, wh, 12); ctx.fillStyle = 'rgba(8,9,12,.85)'; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.stroke(); ctx.restore();
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 14; rrect(ctx, -cardW/2, wy + 9, cardW, cardH, cardW*0.035); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
-  ctx.save(); rrect(ctx, -cardW/2, wy + 9, cardW, cardH, cardW*0.035); ctx.clip(); ctx.drawImage(im, -cardW/2, wy + 9, cardW, cardH); ctx.restore();
-  // ---- glare across the plastic ----
-  ctx.save(); rrect(ctx, x0, y0, W2, H, R); ctx.clip();
-  const g1 = ctx.createLinearGradient(x0, y0, x0 + W2*0.9, y0 + H*0.75);
-  g1.addColorStop(.18, 'rgba(255,255,255,0)'); g1.addColorStop(.27, 'rgba(255,255,255,.16)'); g1.addColorStop(.31, 'rgba(255,255,255,.05)'); g1.addColorStop(.36, 'rgba(255,255,255,0)');
-  g1.addColorStop(.58, 'rgba(255,255,255,0)'); g1.addColorStop(.62, 'rgba(255,255,255,.08)'); g1.addColorStop(.64, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g1; ctx.fillRect(x0, y0, W2, H);
-  const g2 = ctx.createLinearGradient(x0, 0, x0 + 40, 0); g2.addColorStop(0, 'rgba(255,255,255,.22)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g2; ctx.fillRect(x0, y0, 40, H);
-  ctx.restore();
-  ctx.restore();
-  return W2;
-}
-// A holographic security patch: iridescent foil, no lettering.
-function holoPatch(ctx, x, y, w, h){
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  ['#d9dde6','#f6c7e4','#c7e8f6','#e9f6c7','#d0c7f6','#e3e6ec'].forEach((c,i)=>g.addColorStop(i/5, c));
-  rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.fillStyle = g; ctx.fill();
-  ctx.save(); rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.clip(); ctx.globalAlpha = .35; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
-  for(let k=-h; k<w; k+=5){ ctx.beginPath(); ctx.moveTo(x + k, y + h); ctx.lineTo(x + k + h, y); ctx.stroke(); } ctx.restore();
-  rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke();
-}
-function slabLabel(ctx, S, it, x, y, w, h){
-  const year = (it.setDate||'').slice(0, 4), gameW = it.game === 'onepiece' ? 'ONE PIECE' : it.lang === 'en' ? 'POKEMON' : 'P.M.', langW = it.lang === 'jp' ? ' JAPANESE' : it.lang === 'cn' ? ' CHINESE' : '';
-  const nm = (it.baseName || it.name || '').replace(/\s*\(.*?\)\s*/g, ' ').trim().toUpperCase() + (/holo/i.test(it.variant||'') && !/reverse/i.test(it.variant) ? '-HOLO' : '');
-  const L = [(year ? year+' ' : '') + gameW + langW, nm, shortSet(it.set).toUpperCase()], num = it.number ? '#'+String(it.number).split('/')[0] : '';
-  const F = (wt, px) => wt+' '+Math.round(px)+'px "Barlow Semi Condensed"';
-  const lines = (col, room, fs, top, lh)=>{ ctx.fillStyle = col; ctx.textAlign = 'left'; L.forEach((l, i)=>{ let f = fs; ctx.font = F(600, f); while(ctx.measureText(l).width > room && f > fs*0.74){ f -= 1; ctx.font = F(600, f); } ctx.fillText(clip(ctx, l, room), x + 16, y + top + i*lh); }); };
-  ctx.textBaseline = 'alphabetic';
-  if(S.co === 'PSA'){
-    // white insert, bold red frame, three lines left, cert column right, foil patch at the bottom
-    ctx.fillStyle = '#D21F2B'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#FCFCFA'; ctx.fillRect(x + 7, y + 7, w - 14, h - 14);
-    const fs = h*0.155, lh = h*0.175, top = h*0.3;
-    ctx.font = F(600, fs); const rw = Math.max(ctx.measureText(num).width, ctx.measureText(S.word).width) + 6;
-    lines('#151515', w - 32 - rw - 10, fs, top, lh);
-    ctx.textAlign = 'right'; ctx.font = F(600, fs); ctx.fillStyle = '#151515'; ctx.fillText(num, x + w - 16, y + top); ctx.fillText(S.word, x + w - 16, y + top + lh); ctx.fillText(S.n, x + w - 16, y + top + lh*2); ctx.textAlign = 'left';
-    holoPatch(ctx, x + w/2 - 34, y + h - 34, 68, 22);
-  } else if(S.co === 'BECKETT'){
-    const black = /PRISTINE/.test(S.word) && S.bg === '#0E0E10';
-    const bg = ctx.createLinearGradient(x, y, x + w, y + h);
-    if(black){ bg.addColorStop(0, '#1c1c1f'); bg.addColorStop(.5, '#09090a'); bg.addColorStop(1, '#19191c'); }
-    else { bg.addColorStop(0, '#9c7420'); bg.addColorStop(.3, '#f1d27c'); bg.addColorStop(.55, '#c99a35'); bg.addColorStop(.8, '#f5dc92'); bg.addColorStop(1, '#a57b22'); }
-    ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
-    const ink = black ? '#E9D9A6' : '#24180A', box = h*0.62, bx = x + w - box - 12, by = y + 12;
-    lines(ink, w - 32 - box - 10, h*0.14, h*0.27, h*0.16);
-    // grade box
-    rrect(ctx, bx, by, box, box, 6); ctx.fillStyle = black ? '#000' : 'rgba(20,14,4,.88)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = black ? '#C9A227' : 'rgba(255,240,200,.6)'; ctx.stroke();
-    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = '#E9C96B'; ctx.fillText(S.word, bx + box/2, by + box*0.27);
-    ctx.font = F(700, box*0.56); ctx.fillStyle = '#F5DE95'; ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
-    // subgrades (all 10 for a Black Label)
-    const subs = black ? [['CEN','10'],['COR','10'],['EDG','10'],['SUR','10']] : null;
-    if(subs){ const sw = (w - box - 40)/4, sy = y + h - 30; subs.forEach(([k, v], i)=>{ const sx = x + 16 + i*sw; rrect(ctx, sx, sy, sw - 6, 20, 3); ctx.fillStyle = 'rgba(201,162,39,.16)'; ctx.fill();
-      ctx.font = F(600, 11); ctx.fillStyle = '#B9A26A'; ctx.fillText(k, sx + 5, sy + 14); ctx.font = F(700, 13); ctx.fillStyle = '#F5DE95'; ctx.textAlign = 'right'; ctx.fillText(v, sx + sw - 11, sy + 15); ctx.textAlign = 'left'; }); }
-    else holoPatch(ctx, x + 16, y + h - 28, 56, 16);
-  } else if(S.co === 'CGC'){
-    ctx.fillStyle = '#FBFCFE'; ctx.fillRect(x, y, w, h);
-    const band = ctx.createLinearGradient(x, 0, x + w, 0); band.addColorStop(0, '#0E2A5C'); band.addColorStop(1, '#1C5FA8'); ctx.fillStyle = band; ctx.fillRect(x, y, w, h*0.12);
-    ctx.fillStyle = '#0E2A5C'; ctx.fillRect(x, y + h - 4, w, 4);
-    const box = h*0.6, bx = x + w - box - 12, by = y + h*0.2;
-    lines('#13213F', w - 32 - box - 10, h*0.14, h*0.37, h*0.165);
-    rrect(ctx, bx, by, box, box, 6); ctx.fillStyle = '#0E2A5C'; ctx.fill();
-    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = '#CFE0F7'; ctx.fillText(S.word, bx + box/2, by + box*0.26);
-    ctx.font = F(700, box*0.56); ctx.fillStyle = '#fff'; ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
-    holoPatch(ctx, x + 16, y + h - 26, 52, 14);
-  } else {
-    // TAG / other: black insert, white type, big grade
-    ctx.fillStyle = S.co === 'TAG' ? '#0A0A0B' : '#F2F0EB'; ctx.fillRect(x, y, w, h);
-    const ink = S.co === 'TAG' ? '#F4F4F4' : '#151515', box = h*0.6, bx = x + w - box - 12, by = y + h*0.2;
-    lines(ink, w - 32 - box - 10, h*0.14, h*0.33, h*0.17);
-    rrect(ctx, bx, by, box, box, 6); ctx.lineWidth = 2; ctx.strokeStyle = ink; ctx.stroke();
-    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = ink; ctx.fillText(S.word, bx + box/2, by + box*0.26);
-    ctx.font = F(700, box*0.56); ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
-    ctx.fillStyle = S.co === 'TAG' ? 'rgba(255,255,255,.25)' : 'rgba(0,0,0,.2)';
-    for(let r=0;r<3;r++) for(let c=0;c<14;c++){ ctx.beginPath(); ctx.arc(x + 18 + c*7, y + h - 22 + r*6, 1.3, 0, Math.PI*2); ctx.fill(); }
-  }
-  num && S.co !== 'PSA' && (ctx.font = F(600, h*0.12), ctx.fillStyle = S.co === 'BECKETT' ? (S.bg === '#0E0E10' ? '#B9A26A' : '#3A2A0E') : S.co === 'CGC' ? '#4A5A78' : (S.co === 'TAG' ? '#9A9A9A' : '#555'), ctx.textAlign = 'left', ctx.fillText(num, x + 16, y + h*0.13 + (S.co === 'CGC' ? h*0.11 : 0)), 0);
-}
 function drawShowcase(st){
   if(!bcFonts()) return null;
   const it = st.it, W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -3310,11 +3029,7 @@ function drawShowcase(st){
   // ---- the card, tilted a touch, foil catching the light ----
   const CH = 640, CY = 132, ang = -0.045;
   let cardBox = null;
-  if(art && show.grade !== 'Raw'){
-    const cx = 500, cy = CY + CH/2 - 6, cw = drawSlab(ctx, art.img, it, show.grade, cx, cy, CH + 24, ang, cA);
-    cardBox = {cx, cy, cw};
-    drawTag(cx, cw);
-  } else if(art){
+  if(art){
     const im = art.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, cw = CH*iw/ih, r = cw*0.045, cx = 500, cy = CY + CH/2;
     cardBox = {cx, cy, cw};
     ctx.save(); ctx.translate(cx, cy + 40); ctx.scale(1, 0.12); blob(ctx, 0, CH/2*8.3, cw*0.75, 'rgba(0,0,0,.75)'); ctx.restore();
@@ -3337,7 +3052,7 @@ function drawShowcase(st){
   function drawTag(cx, cw){
     const tagV = st.graded || (st.market!=null ? fromUsd(st.market) : null);
     if(tagV!=null){
-      const lab = st.graded ? 'GRADED VALUE' : 'MARKET PRICE', val = m(tagV);
+      const lab = st.graded ? 'MY '+show.grade.toUpperCase().replace(/ BLACK LABEL| PRISTINE/, '')+' VALUE' : 'MARKET PRICE', val = m(tagV);
       ctx.font = '700 15px "JetBrains Mono"'; spaced(ctx, 3); const lw0 = ctx.measureText(lab).width; spaced(ctx, 0);
       ctx.font = '400 74px Anton'; const vw = ctx.measureText(val).width, tw2 = Math.max(vw + 100, lw0 + 100, 260), th = 150;
       ctx.save(); ctx.translate(Math.min(W - 40 - tw2/2, cx + cw/2 + tw2/2 - 46), CY + CH*0.8); ctx.rotate(0.08);
