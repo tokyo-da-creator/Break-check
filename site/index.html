@@ -2907,12 +2907,12 @@ function spotTicker(K){
   if(st.lo!=null) facts.push(['90-DAY RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
   if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); facts.push(['I PAID', m(st.paid), ref ? (ref >= st.paid ? '+' : '−')+m(Math.abs(ref - st.paid), 0)+' since'+(show.where ? ' · '+show.where : '') : (show.where||'')]); }
   else if(st.graded) facts.push([show.grade.toUpperCase()+' VALUE', m(st.graded), 'self-reported']);
-  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(52, 1206, 976, 1);
+  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(52, 1200, 976, 1);
   const cw = 976/Math.max(1, facts.length);
-  facts.forEach(([l, v, n], i)=>{ const x = 52 + i*cw; if(i){ ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 1, 1226, 1, 60); }
-    const px = x + (i ? 24 : 0); spotLabel(ctx, l, px, 1240, faint);
-    spotFit(ctx, v, '700 #px "Barlow Semi Condensed"', 40, cw - 40, 24); ctx.fillStyle = INK; ctx.fillText(v, px, 1280);
-    ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1302); });
+  facts.forEach(([l, v, n], i)=>{ const x = 52 + i*cw; if(i){ ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 1, 1218, 1, 60); }
+    const px = x + (i ? 24 : 0); spotLabel(ctx, l, px, 1232, faint);
+    spotFit(ctx, v, '700 #px "Barlow Semi Condensed"', 40, cw - 40, 24); ctx.fillStyle = INK; ctx.fillText(v, px, 1271);
+    ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1292); });
 }
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
 function drawShowcase(st){
