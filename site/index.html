@@ -2870,6 +2870,50 @@ function softBackdrop(im, key){
   let src = t; [[tw*6, th*6], [tw*30, th*30]].forEach(([w, h])=>{ const c = document.createElement('canvas'); c.width = w; c.height = h; const k = c.getContext('2d'); k.imageSmoothingEnabled = true; k.imageSmoothingQuality = 'high'; k.drawImage(src, 0, 0, w, h); src = c; });
   softCache.set(key, src); return src;
 }
+
+// Shared: a clean sparkline with soft area, glow and a 'now' dot. Returns the end point.
+function spotSpark(ctx, pts, x0, y0, x1, y1, col, o){
+  o = o || {};
+  const ys = pts.map(p=>p[1]); let lo = Math.min(...ys), hi = Math.max(...ys); const pad = (hi - lo)*0.1 || hi*0.05 || 1; lo -= pad; hi += pad;
+  const X = i => x0 + i/(pts.length-1)*(x1 - x0), Y = v => y1 - (v - lo)/(hi - lo)*(y1 - y0), P = pts.map((p,i)=>[X(i), Y(p[1])]);
+  if(o.start){ ctx.save(); ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(x0, P[0][1]); ctx.lineTo(x1, P[0][1]); ctx.stroke(); ctx.restore(); }
+  ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineTo(x1, y1 + (o.fillDrop||30)); ctx.lineTo(x0, y1 + (o.fillDrop||30)); ctx.closePath();
+  const f = ctx.createLinearGradient(0, y0, 0, y1 + (o.fillDrop||30)); f.addColorStop(0, hexA(col, o.fillA!=null ? o.fillA : .34)); f.addColorStop(1, hexA(col, 0)); ctx.fillStyle = f; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = (o.w||4) + 7; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = hexA(col, .16); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = o.w||4; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.shadowColor = hexA(col, .8); ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
+  const e = P[P.length-1];
+  ctx.beginPath(); ctx.arc(e[0], e[1], 15, 0, Math.PI*2); ctx.fillStyle = hexA(col, .18); ctx.fill();
+  ctx.beginPath(); ctx.arc(e[0], e[1], 6, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+  return {e, P};
+}
+function spotLabel(ctx, txt, x, y, col, align){ ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = col; ctx.textAlign = align||'left'; ctx.fillText(txt, x, y); ctx.textAlign = 'left'; spaced(ctx, 0); }
+function spotFit(ctx, txt, font, size, maxW, min){ let fs = size; ctx.font = font.replace('#', fs); while(ctx.measureText(txt).width > maxW && fs > (min||20)){ fs -= 2; ctx.font = font.replace('#', fs); } return fs; }
+// A: editorial ticker — one huge number, a big clean line, three facts underneath.
+function spotTicker(K){
+  const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
+  const chg = st.change==null ? null : Math.abs(st.change*100);
+  spotLabel(ctx, '90-DAY CHANGE', 52, 952, faint);
+  const big = chg==null ? '—' : (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%';
+  spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
+  if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
+    const a = m(fromUsd(st.pts[0][1])), b = m(st.market!=null ? fromUsd(st.market) : fromUsd(st.pts[st.pts.length-1][1])); ctx.fillText(a+'  →  '+b, 52, 1148); }
+  ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : 'TCGplayer market price', 52, 1178);
+  if(st.pts.length >= 2){ spotSpark(ctx, st.pts, 470, 950, 1024, 1150, cA, {start: true, fillDrop: 40});
+    ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; ctx.fillText(shortDate(st.pts[0][0]), 470, 1186); ctx.textAlign = 'right'; ctx.fillText('TODAY', 1024, 1186); ctx.textAlign = 'left'; spaced(ctx, 0); }
+  else { ctx.font = '500 17px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No price history yet.', 470, 1060); }
+  // three facts
+  const facts = [];
+  if(st.sales[0]) facts.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), (COND[st.sales[0].cond]||'')+' · '+shortDate(st.sales[0].d)]);
+  if(st.lo!=null) facts.push(['90-DAY RANGE', m(fromUsd(st.lo), 0)+' – '+m(fromUsd(st.hi), 0), 'low to high']);
+  if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); facts.push(['I PAID', m(st.paid), ref ? (ref >= st.paid ? '+' : '−')+m(Math.abs(ref - st.paid), 0)+' since'+(show.where ? ' · '+show.where : '') : (show.where||'')]); }
+  else if(st.graded) facts.push([show.grade.toUpperCase()+' VALUE', m(st.graded), 'self-reported']);
+  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(52, 1206, 976, 1);
+  const cw = 976/Math.max(1, facts.length);
+  facts.forEach(([l, v, n], i)=>{ const x = 52 + i*cw; if(i){ ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 1, 1226, 1, 60); }
+    const px = x + (i ? 24 : 0); spotLabel(ctx, l, px, 1240, faint);
+    spotFit(ctx, v, '700 #px "Barlow Semi Condensed"', 40, cw - 40, 24); ctx.fillStyle = INK; ctx.fillText(v, px, 1280);
+    ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, n, cw - 40), px, 1302); });
+}
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
 function drawShowcase(st){
   if(!bcFonts()) return null;
@@ -2956,90 +3000,8 @@ function drawShowcase(st){
   if(ctx.measureText(meta).width > W - 104) meta = [shortSet(it.set), it.number ? '#'+it.number : '', rarAbbr(it.rarity), it.variant, LANGN[it.lang]].filter(Boolean).join('  ·  ').toUpperCase();
   ctx.fillStyle = soft; ctx.fillText(clip(ctx, meta, W - 104), 52, 896); spaced(ctx, 0);
   ctx.restore();
-  // ---- glass panel ----
-  const PX = 40, PY = 922, PW = W - 80, PH = 380;
-  ctx.save(); rrect(ctx, PX, PY, PW, PH, 26); ctx.fillStyle = 'rgba(255,255,255,.055)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.stroke();
-  const edge = ctx.createLinearGradient(PX, 0, PX + PW, 0); edge.addColorStop(0, hexA(cA, 0)); edge.addColorStop(.5, hexA(cA, .8)); edge.addColorStop(1, hexA(cB, 0)); ctx.fillStyle = edge; ctx.fillRect(PX + 40, PY, PW - 80, 2); ctx.restore();
-  // stats
-  const cols = [];
-  cols.push(['90 DAYS', st.change==null ? '—' : (up ? '▲ ' : '▼ ')+Math.abs(st.change*100).toFixed(1)+'%', st.change==null ? INK : trend, st.sold ? st.sold+' sold' : 'TCGplayer']);
-  if(st.lo!=null) cols.push(['90-DAY RANGE', m(fromUsd(st.lo), 0)+'–'+m(fromUsd(st.hi), 0), INK, 'low – high']);
-  if(st.paid){ const ref = st.graded || (st.market!=null ? fromUsd(st.market) : null); cols.push(['I PAID', m(st.paid), INK, ref ? (ref >= st.paid ? '+' : '-')+m(Math.abs(ref - st.paid), 0)+(show.where ? ' · '+show.where : '') : (show.where||'')]); }
-  else if(st.sales[0]) cols.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), INK, shortDate(st.sales[0].d)]);
-  if(st.graded && st.market!=null) cols.push(['RAW MARKET', m(fromUsd(st.market)), INK, 'TCGplayer']);
-  const cwid = (PW - 48)/cols.length;
-  cols.forEach(([lab, val, col, note], i)=>{
-    const x = PX + 24 + i*cwid + (i ? 18 : 6);
-    if(i){ ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(PX + 24 + i*cwid, PY + 26, 1, 74); }
-    ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText(lab, x, PY + 42); spaced(ctx, 0);
-    let vs = 42; ctx.font = '700 '+vs+'px "Barlow Semi Condensed"'; while(ctx.measureText(val).width > cwid - 30 && vs > 24){ vs -= 2; ctx.font = '700 '+vs+'px "Barlow Semi Condensed"'; }
-    ctx.fillStyle = col; ctx.fillText(val, x, PY + 84);
-    ctx.font = '500 13px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(clip(ctx, note, cwid - 30), x, PY + 106);
-  });
-  // chart: modern price card — dot grid, glowing line, dashed 'where it started' line, price pills, no axis clutter
-  const gx0 = PX + 30, gx1 = PX + PW - 30, gy0 = PY + 172, gy1 = PY + 262, vb = PY + 284;
-  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText('PRICE HISTORY', gx0, PY + 146);
-  if(st.pts.length >= 2){ const tw0 = ctx.measureText('PRICE HISTORY').width; ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(gx0 + tw0 + 14, PY + 141, 18, 0); ctx.setLineDash && ctx.save();
-    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(gx0 + tw0 + 16, PY + 142); ctx.lineTo(gx0 + tw0 + 38, PY + 142); ctx.stroke(); ctx.restore();
-    ctx.fillStyle = faint; ctx.fillText('90D AGO '+m(fromUsd(st.pts[0][1]), st.pts[0][1] >= 100 ? 0 : 2), gx0 + tw0 + 46, PY + 146); }
-  spaced(ctx, 0);
-  { // range pills, 90D active
-    const tabs = ['7D', '30D', '90D'], tw = 46, th = 24, gap = 6; let x = gx1 - (tabs.length*tw + (tabs.length-1)*gap);
-    rrect(ctx, x - 4, PY + 128, tabs.length*tw + (tabs.length-1)*gap + 8, th + 8, 16); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
-    tabs.forEach(t=>{ const on = t === '90D'; if(on){ rrect(ctx, x, PY + 132, tw, th, 12); ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill(); }
-      ctx.font = '700 12px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.fillStyle = on ? INK : faint; ctx.fillText(t, x + tw/2, PY + 149); ctx.textAlign = 'left'; x += tw + gap; });
-  }
-  // dot grid
-  ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.07)';
-  for(let y = gy0 - 14; y <= gy1 + 4; y += 14) for(let x = gx0; x <= gx1; x += 14){ ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI*2); ctx.fill(); }
-  ctx.restore();
-  const pill = (txt, x, y, bg, fg, align)=>{ ctx.font = '700 15px "Barlow Semi Condensed"'; const w = ctx.measureText(txt).width + 18, h = 24;
-    let px = align === 'right' ? x - w : align === 'center' ? x - w/2 : x; px = Math.max(gx0 - 6, Math.min(gx1 + 6 - w, px));
-    rrect(ctx, px, y - h/2, w, h, 12); ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.fillText(txt, px + 9, y + 5); };
-  if(st.pts.length >= 2){
-    const pts = st.pts, ys = pts.map(p=>p[1]); let lo = Math.min(...ys), hi = Math.max(...ys); const pad = (hi - lo)*0.08 || hi*0.04 || 1; lo -= pad; hi += pad;
-    const X = i => gx0 + i/(pts.length-1)*(gx1 - gx0), Y = v => gy1 - (v - lo)/(hi - lo)*(gy1 - gy0);
-    const P = pts.map((p,i)=>[X(i), Y(p[1])]);
-    // where it started, 90 days ago
-    const y0 = P[0][1];
-    ctx.save(); ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.beginPath(); ctx.moveTo(gx0, y0); ctx.lineTo(gx1, y0); ctx.stroke(); ctx.restore();
-    // area + line
-    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineTo(gx1, gy1 + 22); ctx.lineTo(gx0, gy1 + 22); ctx.closePath();
-    const fill = ctx.createLinearGradient(0, gy0, 0, gy1 + 22); fill.addColorStop(0, hexA(cA, .38)); fill.addColorStop(.7, hexA(cA, .06)); fill.addColorStop(1, hexA(cA, 0)); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
-    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 9; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = hexA(cA, .18); ctx.stroke(); ctx.restore();
-    ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = cA; ctx.shadowColor = hexA(cA, .8); ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
-    // high (if it isn't the start or the end)
-    const hiI = ys.indexOf(Math.max(...ys)), loI = ys.indexOf(Math.min(...ys));
-    const ring = (q)=>{ ctx.beginPath(); ctx.arc(q[0], q[1], 5.5, 0, Math.PI*2); ctx.fillStyle = '#0B0B0C'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke(); };
-    if(hiI > 1 && hiI < pts.length - 2){ ring(P[hiI]); pill('HIGH '+m(fromUsd(ys[hiI]), ys[hiI] >= 100 ? 0 : 2), P[hiI][0], P[hiI][1] - 20 < gy0 ? P[hiI][1] + 22 : P[hiI][1] - 20, 'rgba(255,255,255,.14)', INK, 'center'); }
-    if(loI > 1 && loI < pts.length - 2 && Math.abs(loI - hiI) > 3){ ring(P[loI]); pill('LOW '+m(fromUsd(ys[loI]), ys[loI] >= 100 ? 0 : 2), P[loI][0], P[loI][1] + 22, 'rgba(255,255,255,.14)', INK, 'center'); }
-    // today: halo dot + price pill in the card's colour
-    const e = P[P.length-1], nowV = st.market!=null ? st.market : ys[ys.length-1];
-    ctx.beginPath(); ctx.arc(e[0], e[1], 16, 0, Math.PI*2); ctx.fillStyle = hexA(cA, .16); ctx.fill();
-    ctx.beginPath(); ctx.arc(e[0], e[1], 9, 0, Math.PI*2); ctx.fillStyle = hexA(cA, .35); ctx.fill();
-    ctx.beginPath(); ctx.arc(e[0], e[1], 5, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
-    pill('NOW '+m(fromUsd(nowV), nowV >= 100 ? 0 : 2), e[0] - 22, e[1] < gy0 + 24 ? e[1] + 26 : e[1] - 26, cA, '#0B0B0C', 'right');
-    // sales activity: slim capsules
-    const vmax = Math.max(1, ...pts.map(p=>p[2]||0)), step = (gx1 - gx0)/Math.max(1, pts.length - 1);
-    pts.forEach((p,i)=>{ const h = Math.max(2, (p[2]||0)/vmax*14); rrect(ctx, X(i) - 2, vb - h, 4, h, 2); ctx.fillStyle = (p[2]||0) ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.07)'; ctx.fill(); });
-    // months
-    ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; let lastM = '';
-    pts.forEach((p,i)=>{ const mo = p[0].slice(0, 7); if(mo !== lastM){ if(lastM && X(i) < gx1 - 80 && X(i) > gx0 + 20){ const lab = new Date(p[0]+'T00:00:00Z').toLocaleDateString('en-AU', {month: 'short', timeZone: 'UTC'}).toUpperCase(); ctx.textAlign = 'center'; ctx.fillText(lab, X(i), vb + 18); ctx.textAlign = 'left'; } lastM = mo; } });
-    ctx.textAlign = 'right'; ctx.fillText('TODAY', gx1, vb + 18); ctx.textAlign = 'left'; spaced(ctx, 0);
-  } else { ctx.font = '500 17px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer price history for this card yet.', gx0, gy0 + 40); }
-  // recent sales chips
-  if(st.sales.length){
-    const k = Math.min(4, st.sales.length), sy = PY + PH - 58, gap = 10, sw = (PW - 48 - gap*(k-1))/k;
-    ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText('RECENT SALES', gx0, sy - 10); spaced(ctx, 0);
-    st.sales.slice(0, k).forEach((x, i)=>{
-      const bx = PX + 24 + i*(sw + gap), c = COND[x.cond] || '', cc = CONDCOL[c] || '#9AA4FF';
-      rrect(ctx, bx, sy, sw, 42, 10); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.font = '700 21px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(m(fromUsd(x.p)), bx + 12, sy + 28);
-      ctx.font = '700 11px "JetBrains Mono"'; const cw2 = ctx.measureText(c).width + 12;
-      rrect(ctx, bx + sw - cw2 - 10, sy + 12, cw2, 18, 9); ctx.fillStyle = hexA(cc, .2); ctx.fill(); ctx.fillStyle = cc; ctx.textAlign = 'center'; ctx.fillText(c, bx + sw - cw2/2 - 10, sy + 25); ctx.textAlign = 'left';
-      ctx.font = '500 11px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.textAlign = 'right'; ctx.fillText(shortDate(x.d), bx + sw - cw2 - 18, sy + 26); ctx.textAlign = 'left';
-    });
-  }
+  // ---- bottom: price story ----
+  spotTicker({ctx, st, cA, cB, INK, soft, faint, m, up, trend, W});
   // footer
   ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
   ctx.fillText((it.lang==='cn' ? 'CARDOS SOLD PRICES' : 'TCGPLAYER MARKET DATA')+'  ·  '+cur, 52, H - 24);
