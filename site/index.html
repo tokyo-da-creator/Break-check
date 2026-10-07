@@ -3155,7 +3155,7 @@ function renderTop(){
     li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
   });
   $('topNote').textContent = top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
-    : 'Change from TCGplayer’s near-mint market price '+(top.period === 'month' ? '30' : '7')+' days ago to today. Cards worth $20+ with at least '+(top.period === 'month' ? 8 : 4)+' sales in that time'+(topMeta && topMeta.at ? '. History updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}) : '')+'.';
+    : 'Change from TCGplayer’s near-mint market price '+(top.period === 'month' ? '30' : '7')+' days ago to today. Cards worth $20+ with at least '+(top.period === 'month' ? 12 : 6)+' sales in that time'+(topMeta && topMeta.at ? '. History updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}) : '')+'.';
   topItems.forEach(x=>productArt(x.id, false));
   drawTopSoon();
 }

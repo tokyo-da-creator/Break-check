@@ -237,7 +237,7 @@ window.__noShare = true;
       if(lang!=null && c.sets[e[7]][2]!==lang) return;
       var then = per==='week' ? r[3] : r[4], sold = per==='week' ? r[5] : r[6];
       if(!then || !r[2]) return;
-      if(kind!=='sold' && sold < (per==='week' ? 4 : 8)) return;
+      if(kind!=='sold' && sold < (per==='week' ? 6 : 12)) return;   // enough sales that the move is real, not one odd sale
       var ch = r[2]/then - 1;
       list.push({i:i, ch:ch, then:then, now:r[2], sold:sold});
     });
