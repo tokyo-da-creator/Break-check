@@ -1,0 +1,40 @@
+name: Refresh prices
+
+# TCGplayer's daily price file lands around 20:00 UTC. Rebuild and redeploy shortly after,
+# with a second run later in case the first one lands before the new file.
+on:
+  schedule:
+    - cron: "35 20 * * *"
+    - cron: "35 23 * * *"
+  workflow_dispatch:
+  # Any change pushed to main is built and published too (docs-only changes are skipped).
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+
+concurrency: refresh-prices
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build price catalog
+        env:
+          PRICECHARTING_TOKEN: ${{ secrets.PRICECHARTING_TOKEN }}
+          CARDOS_API_KEY: ${{ secrets.CARDOS_API_KEY }}
+        run: python scripts/build_catalog.py
+      - name: Build One Piece catalog
+        # If this fails the last good One Piece catalog in the repo is published, and Pokémon still updates.
+        continue-on-error: true
+        run: python scripts/build_onepiece.py
+      - name: Build page
+        run: python scripts/build_site.py
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx -y wrangler@4 deploy
