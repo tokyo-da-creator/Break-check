@@ -893,7 +893,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791370445';
+(function(){ var BUILD='1791370750';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3174,45 +3174,109 @@ function slabStyle(grade){
 }
 function drawSlab(ctx, im, it, grade, cx, cy, H, ang, glow){
   const S = slabStyle(grade), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const pad = 22, labH = H*0.21, gap = 14, cardH = H - labH - gap - pad*2 - 10, cardW = cardH*iw/ih, W2 = cardW + pad*2 + 12, x0 = -W2/2, y0 = -H/2;
+  const rim = 16, pad = 26, labH = H*0.205, gap = 22, cardH = H - labH - gap - pad*2 - 18, cardW = cardH*iw/ih, W2 = cardW + pad*2 + 18, x0 = -W2/2, y0 = -H/2, R = 18;
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-  // case: glow, shadow, acrylic body
-  ctx.save(); ctx.shadowColor = hexA(glow, .6); ctx.shadowBlur = 110; rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill(); ctx.restore();
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 26; rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = 'rgba(30,32,38,.55)'; ctx.fill(); ctx.restore();
-  const body = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H); body.addColorStop(0, 'rgba(255,255,255,.20)'); body.addColorStop(.5, 'rgba(255,255,255,.07)'); body.addColorStop(1, 'rgba(255,255,255,.16)');
-  rrect(ctx, x0, y0, W2, H, 22); ctx.fillStyle = body; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.stroke();
-  rrect(ctx, x0 + 8, y0 + 8, W2 - 16, H - 16, 16); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
-  // label
+  // ---- the case ----
+  ctx.save(); ctx.shadowColor = hexA(glow, .55); ctx.shadowBlur = 110; rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.75)'; ctx.shadowBlur = 55; ctx.shadowOffsetY = 30; rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = 'rgba(22,24,30,.35)'; ctx.fill(); ctx.restore();
+  // thick acrylic rim: lit from the top left
+  const rimG = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H);
+  rimG.addColorStop(0, 'rgba(255,255,255,.62)'); rimG.addColorStop(.35, 'rgba(210,220,235,.28)'); rimG.addColorStop(.65, 'rgba(160,170,190,.22)'); rimG.addColorStop(1, 'rgba(255,255,255,.45)');
+  rrect(ctx, x0, y0, W2, H, R); ctx.fillStyle = rimG; ctx.fill();
+  // inner body (slightly darker, the plastic you look through)
+  const bodyG = ctx.createLinearGradient(0, y0, 0, y0 + H); bodyG.addColorStop(0, 'rgba(70,76,90,.42)'); bodyG.addColorStop(1, 'rgba(20,22,28,.6)');
+  rrect(ctx, x0 + rim*0.55, y0 + rim*0.55, W2 - rim*1.1, H - rim*1.1, R - 6); ctx.fillStyle = bodyG; ctx.fill();
+  // bevel lines
+  rrect(ctx, x0 + 1.5, y0 + 1.5, W2 - 3, H - 3, R); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.stroke();
+  rrect(ctx, x0 + rim*0.55, y0 + rim*0.55, W2 - rim*1.1, H - rim*1.1, R - 6); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke();
+  rrect(ctx, x0 + rim*0.55 + 2, y0 + rim*0.55 + 2, W2 - rim*1.1 - 4, H - rim*1.1 - 4, R - 7); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
+  // ---- the label insert ----
   const lx = x0 + pad, ly = y0 + pad, lw = W2 - pad*2;
-  rrect(ctx, lx, ly, lw, labH, 6); ctx.fillStyle = S.bg; ctx.fill();
-  rrect(ctx, lx + 5, ly + 5, lw - 10, labH - 10, 4); ctx.lineWidth = 5; ctx.strokeStyle = S.frame; ctx.stroke();
-  const year = (it.setDate||'').slice(0, 4), gameW = it.game === 'onepiece' ? 'ONE PIECE' : it.lang === 'en' ? 'POKEMON' : 'P.M.', langW = it.lang === 'jp' ? ' JAPANESE' : it.lang === 'cn' ? ' CHINESE' : '';
-  const nm = (it.baseName || it.name || '').replace(/\s*\(.*?\)\s*/g, ' ').trim().toUpperCase() + (/holo/i.test(it.variant||'') && !/reverse/i.test(it.variant) ? '-HOLO' : '');
-  const lines = [(year ? year+' ' : '') + gameW + langW, nm, shortSet(it.set).toUpperCase()];
-  const num = it.number ? '#'+String(it.number).split('/')[0] : '';
-  const tx = lx + 18, rx = lx + lw - 18, fs = Math.round(labH*0.125), lh = labH*0.175, ty = ly + labH*0.27;
-  ctx.textBaseline = 'alphabetic'; ctx.fillStyle = S.ink;
-  ctx.font = '700 '+Math.round(fs*1.05)+'px Archivo'; ctx.textAlign = 'right';
-  const rightW = Math.max(ctx.measureText(num).width, ctx.measureText(S.word).width, ctx.measureText(S.n).width);
-  ctx.fillText(num, rx, ty); ctx.fillText(S.word, rx, ty + lh);
-  ctx.font = '800 '+Math.round(fs*1.35)+'px Archivo'; ctx.fillText(S.n || '', rx, ty + lh*2 + fs*0.2);
-  ctx.textAlign = 'left'; ctx.font = '700 '+fs+'px Archivo';
-  lines.forEach((l, i)=>{ let f2 = fs; ctx.font = '700 '+f2+'px Archivo'; const room = lw - 36 - rightW - 14;
-    while(ctx.measureText(l).width > room && f2 > fs*0.78){ f2 -= 1; ctx.font = '700 '+f2+'px Archivo'; } ctx.fillText(clip(ctx, l, room), tx, ty + i*lh); });
-  // grader badge, bottom centre of the label
-  ctx.font = '900 '+Math.round(fs*1.0)+'px Archivo'; spaced(ctx, 1); const bw = ctx.measureText(S.co).width + 22, bh = fs*1.45;
-  rrect(ctx, lx + lw/2 - bw/2, ly + labH - bh - 11, bw, bh, 4); ctx.fillStyle = S.badge; ctx.fill();
-  ctx.fillStyle = S.badgeInk; ctx.textAlign = 'center'; ctx.fillText(S.co, lx + lw/2, ly + labH - 11 - bh*0.28); ctx.textAlign = 'left'; spaced(ctx, 0);
-  // card well + card
-  const wx = -cardW/2 - 6, wy = ly + labH + gap, ww = cardW + 12, wh = cardH + 12;
-  rrect(ctx, wx, wy, ww, wh, 10); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
-  ctx.save(); rrect(ctx, -cardW/2, wy + 6, cardW, cardH, cardW*0.04); ctx.clip(); ctx.drawImage(im, -cardW/2, wy + 6, cardW, cardH); ctx.restore();
-  // acrylic glare over everything
-  ctx.save(); rrect(ctx, x0, y0, W2, H, 22); ctx.clip();
-  const gl = ctx.createLinearGradient(x0, y0, x0 + W2, y0 + H); gl.addColorStop(.22, 'rgba(255,255,255,0)'); gl.addColorStop(.33, 'rgba(255,255,255,.20)'); gl.addColorStop(.38, 'rgba(255,255,255,.04)'); gl.addColorStop(.62, 'rgba(255,255,255,0)'); gl.addColorStop(.7, 'rgba(255,255,255,.10)'); gl.addColorStop(.74, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.fillRect(x0, y0, W2, H); ctx.restore();
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2; rrect(ctx, lx, ly, lw, labH, 4); ctx.fillStyle = S.bg; ctx.fill(); ctx.restore();
+  ctx.save(); rrect(ctx, lx, ly, lw, labH, 4); ctx.clip(); slabLabel(ctx, S, it, lx, ly, lw, labH); ctx.restore();
+  // ridge under the label
+  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(x0 + rim, ly + labH + gap/2, W2 - rim*2, 1.5);
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0 + rim, ly + labH + gap/2 + 1.5, W2 - rim*2, 1.5);
+  // ---- the card well ----
+  const wy = ly + labH + gap, wx = -cardW/2 - 9, ww = cardW + 18, wh = cardH + 18;
+  ctx.save(); rrect(ctx, wx, wy, ww, wh, 12); ctx.fillStyle = 'rgba(8,9,12,.85)'; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 14; rrect(ctx, -cardW/2, wy + 9, cardW, cardH, cardW*0.035); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  ctx.save(); rrect(ctx, -cardW/2, wy + 9, cardW, cardH, cardW*0.035); ctx.clip(); ctx.drawImage(im, -cardW/2, wy + 9, cardW, cardH); ctx.restore();
+  // ---- glare across the plastic ----
+  ctx.save(); rrect(ctx, x0, y0, W2, H, R); ctx.clip();
+  const g1 = ctx.createLinearGradient(x0, y0, x0 + W2*0.9, y0 + H*0.75);
+  g1.addColorStop(.18, 'rgba(255,255,255,0)'); g1.addColorStop(.27, 'rgba(255,255,255,.16)'); g1.addColorStop(.31, 'rgba(255,255,255,.05)'); g1.addColorStop(.36, 'rgba(255,255,255,0)');
+  g1.addColorStop(.58, 'rgba(255,255,255,0)'); g1.addColorStop(.62, 'rgba(255,255,255,.08)'); g1.addColorStop(.64, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g1; ctx.fillRect(x0, y0, W2, H);
+  const g2 = ctx.createLinearGradient(x0, 0, x0 + 40, 0); g2.addColorStop(0, 'rgba(255,255,255,.22)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g2; ctx.fillRect(x0, y0, 40, H);
+  ctx.restore();
   ctx.restore();
   return W2;
+}
+// A holographic security patch: iridescent foil, no lettering.
+function holoPatch(ctx, x, y, w, h){
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  ['#d9dde6','#f6c7e4','#c7e8f6','#e9f6c7','#d0c7f6','#e3e6ec'].forEach((c,i)=>g.addColorStop(i/5, c));
+  rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.clip(); ctx.globalAlpha = .35; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+  for(let k=-h; k<w; k+=5){ ctx.beginPath(); ctx.moveTo(x + k, y + h); ctx.lineTo(x + k + h, y); ctx.stroke(); } ctx.restore();
+  rrect(ctx, x, y, w, h, Math.min(6, h/3)); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke();
+}
+function slabLabel(ctx, S, it, x, y, w, h){
+  const year = (it.setDate||'').slice(0, 4), gameW = it.game === 'onepiece' ? 'ONE PIECE' : it.lang === 'en' ? 'POKEMON' : 'P.M.', langW = it.lang === 'jp' ? ' JAPANESE' : it.lang === 'cn' ? ' CHINESE' : '';
+  const nm = (it.baseName || it.name || '').replace(/\s*\(.*?\)\s*/g, ' ').trim().toUpperCase() + (/holo/i.test(it.variant||'') && !/reverse/i.test(it.variant) ? '-HOLO' : '');
+  const L = [(year ? year+' ' : '') + gameW + langW, nm, shortSet(it.set).toUpperCase()], num = it.number ? '#'+String(it.number).split('/')[0] : '';
+  const F = (wt, px) => wt+' '+Math.round(px)+'px "Barlow Semi Condensed"';
+  const lines = (col, room, fs, top, lh)=>{ ctx.fillStyle = col; ctx.textAlign = 'left'; L.forEach((l, i)=>{ let f = fs; ctx.font = F(600, f); while(ctx.measureText(l).width > room && f > fs*0.74){ f -= 1; ctx.font = F(600, f); } ctx.fillText(clip(ctx, l, room), x + 16, y + top + i*lh); }); };
+  ctx.textBaseline = 'alphabetic';
+  if(S.co === 'PSA'){
+    // white insert, bold red frame, three lines left, cert column right, foil patch at the bottom
+    ctx.fillStyle = '#D21F2B'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#FCFCFA'; ctx.fillRect(x + 7, y + 7, w - 14, h - 14);
+    const fs = h*0.155, lh = h*0.175, top = h*0.3;
+    ctx.font = F(600, fs); const rw = Math.max(ctx.measureText(num).width, ctx.measureText(S.word).width) + 6;
+    lines('#151515', w - 32 - rw - 10, fs, top, lh);
+    ctx.textAlign = 'right'; ctx.font = F(600, fs); ctx.fillStyle = '#151515'; ctx.fillText(num, x + w - 16, y + top); ctx.fillText(S.word, x + w - 16, y + top + lh); ctx.fillText(S.n, x + w - 16, y + top + lh*2); ctx.textAlign = 'left';
+    holoPatch(ctx, x + w/2 - 34, y + h - 34, 68, 22);
+  } else if(S.co === 'BECKETT'){
+    const black = /PRISTINE/.test(S.word) && S.bg === '#0E0E10';
+    const bg = ctx.createLinearGradient(x, y, x + w, y + h);
+    if(black){ bg.addColorStop(0, '#1c1c1f'); bg.addColorStop(.5, '#09090a'); bg.addColorStop(1, '#19191c'); }
+    else { bg.addColorStop(0, '#9c7420'); bg.addColorStop(.3, '#f1d27c'); bg.addColorStop(.55, '#c99a35'); bg.addColorStop(.8, '#f5dc92'); bg.addColorStop(1, '#a57b22'); }
+    ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
+    const ink = black ? '#E9D9A6' : '#24180A', box = h*0.62, bx = x + w - box - 12, by = y + 12;
+    lines(ink, w - 32 - box - 10, h*0.14, h*0.27, h*0.16);
+    // grade box
+    rrect(ctx, bx, by, box, box, 6); ctx.fillStyle = black ? '#000' : 'rgba(20,14,4,.88)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = black ? '#C9A227' : 'rgba(255,240,200,.6)'; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = '#E9C96B'; ctx.fillText(S.word, bx + box/2, by + box*0.27);
+    ctx.font = F(700, box*0.56); ctx.fillStyle = '#F5DE95'; ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
+    // subgrades (all 10 for a Black Label)
+    const subs = black ? [['CEN','10'],['COR','10'],['EDG','10'],['SUR','10']] : null;
+    if(subs){ const sw = (w - box - 40)/4, sy = y + h - 30; subs.forEach(([k, v], i)=>{ const sx = x + 16 + i*sw; rrect(ctx, sx, sy, sw - 6, 20, 3); ctx.fillStyle = 'rgba(201,162,39,.16)'; ctx.fill();
+      ctx.font = F(600, 11); ctx.fillStyle = '#B9A26A'; ctx.fillText(k, sx + 5, sy + 14); ctx.font = F(700, 13); ctx.fillStyle = '#F5DE95'; ctx.textAlign = 'right'; ctx.fillText(v, sx + sw - 11, sy + 15); ctx.textAlign = 'left'; }); }
+    else holoPatch(ctx, x + 16, y + h - 28, 56, 16);
+  } else if(S.co === 'CGC'){
+    ctx.fillStyle = '#FBFCFE'; ctx.fillRect(x, y, w, h);
+    const band = ctx.createLinearGradient(x, 0, x + w, 0); band.addColorStop(0, '#0E2A5C'); band.addColorStop(1, '#1C5FA8'); ctx.fillStyle = band; ctx.fillRect(x, y, w, h*0.12);
+    ctx.fillStyle = '#0E2A5C'; ctx.fillRect(x, y + h - 4, w, 4);
+    const box = h*0.6, bx = x + w - box - 12, by = y + h*0.2;
+    lines('#13213F', w - 32 - box - 10, h*0.14, h*0.37, h*0.165);
+    rrect(ctx, bx, by, box, box, 6); ctx.fillStyle = '#0E2A5C'; ctx.fill();
+    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = '#CFE0F7'; ctx.fillText(S.word, bx + box/2, by + box*0.26);
+    ctx.font = F(700, box*0.56); ctx.fillStyle = '#fff'; ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
+    holoPatch(ctx, x + 16, y + h - 26, 52, 14);
+  } else {
+    // TAG / other: black insert, white type, big grade
+    ctx.fillStyle = S.co === 'TAG' ? '#0A0A0B' : '#F2F0EB'; ctx.fillRect(x, y, w, h);
+    const ink = S.co === 'TAG' ? '#F4F4F4' : '#151515', box = h*0.6, bx = x + w - box - 12, by = y + h*0.2;
+    lines(ink, w - 32 - box - 10, h*0.14, h*0.33, h*0.17);
+    rrect(ctx, bx, by, box, box, 6); ctx.lineWidth = 2; ctx.strokeStyle = ink; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.font = F(700, box*0.15); ctx.fillStyle = ink; ctx.fillText(S.word, bx + box/2, by + box*0.26);
+    ctx.font = F(700, box*0.56); ctx.fillText(S.n, bx + box/2, by + box*0.84); ctx.textAlign = 'left';
+    ctx.fillStyle = S.co === 'TAG' ? 'rgba(255,255,255,.25)' : 'rgba(0,0,0,.2)';
+    for(let r=0;r<3;r++) for(let c=0;c<14;c++){ ctx.beginPath(); ctx.arc(x + 18 + c*7, y + h - 22 + r*6, 1.3, 0, Math.PI*2); ctx.fill(); }
+  }
+  num && S.co !== 'PSA' && (ctx.font = F(600, h*0.12), ctx.fillStyle = S.co === 'BECKETT' ? (S.bg === '#0E0E10' ? '#B9A26A' : '#3A2A0E') : S.co === 'CGC' ? '#4A5A78' : (S.co === 'TAG' ? '#9A9A9A' : '#555'), ctx.textAlign = 'left', ctx.fillText(num, x + 16, y + h*0.13 + (S.co === 'CGC' ? h*0.11 : 0)), 0);
 }
 function drawShowcase(st){
   if(!bcFonts()) return null;
