@@ -43,7 +43,10 @@ window.__noShare = true;
     [/white flare/i,'wht reshiram'],[/mega evolution/i,'meg mega'],[/phantasmal flames/i,'pfl'],[/^base set/i,'base wotc vintage'],
     [/pokemon go/i,'pgo go'],[/champion'?s path/i,'cp champions path'],[/vivid voltage/i,'viv'],[/fusion strike/i,'fst'],[/chilling reign/i,'cre'],
     [/battle styles/i,'bst'],[/darkness ablaze/i,'daa'],[/rebel clash/i,'rcl'],[/sword & shield/i,'swsh'],[/team rocket/i,'rocket']];
-  function setAlias(n){ var o=''; for(var i=0;i<SET_ALIAS.length;i++) if(SET_ALIAS[i][0].test(n)) o+=' '+SET_ALIAS[i][1]; return o; }
+  function setAlias(n){ var o=''; for(var i=0;i<SET_ALIAS.length;i++) if(SET_ALIAS[i][0].test(n)) o+=' '+SET_ALIAS[i][1];
+    // set codes typed with or without the dash: EB05 / EB-05, OP18 / OP-18, ME06 / ME-06
+    var m=String(n).match(/^([A-Za-z]{1,4})-?(\d{1,3}[a-z]?)\b/); if(m) o+=' '+(m[1]+m[2]+' '+m[1]+'-'+m[2]).toLowerCase();
+    return o; }
   function prep(c){
     c.hay = c.items.map(function(e){
       var s = c.sets[e[7]];
@@ -205,7 +208,7 @@ window.__noShare = true;
       if(fixed.join(' ')!==t.join(' ')){ t=fixed; hits=find(t, t.length); loose=hits.length>0; }
     }
     if(!hits.length && t.length>1){ hits=find(t, t.length-1); loose=hits.length>0; }
-    var f=t[0], score={};
+    var f=t[0], score={}, today=new Date().toISOString().slice(0,10);
     hits.forEach(function(i){
       var e=c.items[i], s=c.sets[e[7]], n=e[1].toLowerCase(), v=0;
       if(n.indexOf(f)===0) v+=4;
@@ -218,10 +221,11 @@ window.__noShare = true;
       if(!s[2] && lang==null) v+=1;
       if(e[8]==='s' && e[9]!=null && BREAKABLE[e[9]]) v+=2;
       if(/\bcase\b/i.test(e[1])) v-=3;
-      if(e[5]==null) v-=1;
+      var soon=(s[1]||'')>today;   // upcoming set: no prices yet, but you're looking for it
+      if(e[5]==null && !soon) v-=1;
       // A version you didn't ask for (Prize Pack, Jumbo, promo...) sits below the normal card.
       var sp=specialOf(s[0]); if(sp && !sp.split(' ').some(function(w){ return w.length>2 && t.indexOf(w)>=0; })) v-=6;
-      if(e[5]==null && e[6]==null) v-=2;
+      if(e[5]==null && e[6]==null && !soon) v-=2;
       v+=(Date.parse(s[1])||0)/1e12;
       score[i]=v;
     });

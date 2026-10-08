@@ -795,7 +795,10 @@ header.top .tabs{margin-top:18px}
     [/white flare/i,'wht reshiram'],[/mega evolution/i,'meg mega'],[/phantasmal flames/i,'pfl'],[/^base set/i,'base wotc vintage'],
     [/pokemon go/i,'pgo go'],[/champion'?s path/i,'cp champions path'],[/vivid voltage/i,'viv'],[/fusion strike/i,'fst'],[/chilling reign/i,'cre'],
     [/battle styles/i,'bst'],[/darkness ablaze/i,'daa'],[/rebel clash/i,'rcl'],[/sword & shield/i,'swsh'],[/team rocket/i,'rocket']];
-  function setAlias(n){ var o=''; for(var i=0;i<SET_ALIAS.length;i++) if(SET_ALIAS[i][0].test(n)) o+=' '+SET_ALIAS[i][1]; return o; }
+  function setAlias(n){ var o=''; for(var i=0;i<SET_ALIAS.length;i++) if(SET_ALIAS[i][0].test(n)) o+=' '+SET_ALIAS[i][1];
+    // set codes typed with or without the dash: EB05 / EB-05, OP18 / OP-18, ME06 / ME-06
+    var m=String(n).match(/^([A-Za-z]{1,4})-?(\d{1,3}[a-z]?)\b/); if(m) o+=' '+(m[1]+m[2]+' '+m[1]+'-'+m[2]).toLowerCase();
+    return o; }
   function prep(c){
     c.hay = c.items.map(function(e){
       var s = c.sets[e[7]];
@@ -957,7 +960,7 @@ header.top .tabs{margin-top:18px}
       if(fixed.join(' ')!==t.join(' ')){ t=fixed; hits=find(t, t.length); loose=hits.length>0; }
     }
     if(!hits.length && t.length>1){ hits=find(t, t.length-1); loose=hits.length>0; }
-    var f=t[0], score={};
+    var f=t[0], score={}, today=new Date().toISOString().slice(0,10);
     hits.forEach(function(i){
       var e=c.items[i], s=c.sets[e[7]], n=e[1].toLowerCase(), v=0;
       if(n.indexOf(f)===0) v+=4;
@@ -970,10 +973,11 @@ header.top .tabs{margin-top:18px}
       if(!s[2] && lang==null) v+=1;
       if(e[8]==='s' && e[9]!=null && BREAKABLE[e[9]]) v+=2;
       if(/\bcase\b/i.test(e[1])) v-=3;
-      if(e[5]==null) v-=1;
+      var soon=(s[1]||'')>today;   // upcoming set: no prices yet, but you're looking for it
+      if(e[5]==null && !soon) v-=1;
       // A version you didn't ask for (Prize Pack, Jumbo, promo...) sits below the normal card.
       var sp=specialOf(s[0]); if(sp && !sp.split(' ').some(function(w){ return w.length>2 && t.indexOf(w)>=0; })) v-=6;
-      if(e[5]==null && e[6]==null) v-=2;
+      if(e[5]==null && e[6]==null && !soon) v-=2;
       v+=(Date.parse(s[1])||0)/1e12;
       score[i]=v;
     });
@@ -1044,7 +1048,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791480583';
+(function(){ var BUILD='1791499278';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -1276,9 +1280,28 @@ function productArt(id, sealed){
       if(sealed){ try{ e.img = trimToProduct(src); }catch(err){} }
       e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon();
     };
-    if(sealed) src.src = imgSrc(id, true); else cardTrim(id, true).then(u=>{ src.src = u; }).catch(()=>{});
+    const fail = ()=>{ if(e.failed) return; e.failed = true; if(!$('panel-show').hidden) updateShow(); };
+    src.onerror = fail;
+    if(sealed) src.src = imgSrc(id, true); else cardTrim(id, true).then(u=>{ src.src = u; }).catch(fail);
   }
   return e.ready ? e : null;
+}
+const artFailed = (id, sealed) => { const e = artCache.get(id+(sealed?'s':'c')); return !!(e && e.failed); };
+// Upcoming cards often have no picture on TCGplayer yet: a plain card-shaped stand-in, never anyone's card art.
+const soonArt = new Map();
+function placeholderArt(it){
+  if(soonArt.has(it.id)) return soonArt.get(it.id);
+  const W = 500, H = 700, c = document.createElement('canvas'); c.width = W; c.height = H; const k = c.getContext('2d');
+  const g = k.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#1E1D26'); g.addColorStop(1, '#0C0C10'); k.fillStyle = g; k.fillRect(0, 0, W, H);
+  for(let i = -2; i < 6; i++){ const x = i*150; const s2 = k.createLinearGradient(x, 0, x + 260, H); s2.addColorStop(0, 'rgba(198,255,61,0)'); s2.addColorStop(.5, i % 2 ? 'rgba(140,110,255,.10)' : 'rgba(198,255,61,.07)'); s2.addColorStop(1, 'rgba(198,255,61,0)');
+    k.fillStyle = s2; k.beginPath(); k.moveTo(x, 0); k.lineTo(x + 90, 0); k.lineTo(x + 350, H); k.lineTo(x + 260, H); k.closePath(); k.fill(); }
+  rrect(k, 22, 22, W - 44, H - 44, 18); k.lineWidth = 3; k.strokeStyle = 'rgba(244,241,234,.22)'; k.stroke();
+  k.textAlign = 'center'; k.textBaseline = 'alphabetic';
+  k.font = '400 150px Anton'; k.fillStyle = 'rgba(244,241,234,.9)'; k.fillText('?', W/2, 360);
+  k.font = '700 22px "JetBrains Mono"'; k.fillStyle = 'rgba(244,241,234,.75)'; if(k.letterSpacing !== undefined) k.letterSpacing = '4px';
+  k.fillText(upcoming(it) ? 'CARD REVEAL' : 'NO PICTURE YET', W/2, 440); k.fillText(upcoming(it) ? 'OUT '+outDate(it.setDate).toUpperCase() : 'ON TCGPLAYER', W/2, 474);
+  if(it.number){ k.font = '400 40px Anton'; k.fillStyle = '#C6FF3D'; if(k.letterSpacing !== undefined) k.letterSpacing = '2px'; k.fillText(it.number, W/2, 600); }
+  const out = {img: c, ready: true}; soonArt.set(it.id, out); return out;
 }
 function rrect(ctx, x, y, w, h, r){ ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
 
@@ -2284,11 +2307,17 @@ const VERSIONS=[[/prize pack/i,'Prize Pack (stamped)','PRIZE PACK'],[/jumbo/i,'J
 function versionOf(set){ for(const v of VERSIONS) if(v[0].test(set||'')) return {label:v[1], badge:v[2]}; return null; }
 // Pokémon Center exclusives are a different, pricier product with the same name. Make that impossible to miss.
 const isPC = n => /pokemon center|pokémon center/i.test(n||'');
+// Upcoming sets: TCGplayer lists the products before they sell, so there's no price yet.
+const todayISO = () => new Date().toISOString().slice(0,10);
+const upcoming = it => !!(it && it.setDate && it.setDate > todayISO());
+const outDate = d => new Date(d+'T00:00:00Z').toLocaleDateString('en-AU', {day:'numeric', month:'short', timeZone:'UTC'});
+const soonText = it => upcoming(it) ? 'Price coming soon · out '+outDate(it.setDate) : 'Price coming soon';
 function itemSub(it){
   const bits = [];
   if(isPC(it.name)) bits.push('Pokémon Center exclusive');
   const ver = it.kind!=='sealed' && versionOf(it.set); if(ver) bits.push(ver.label);
-  if(it.basis==='listing' && !it.cn) bits.push('no sales yet · lowest listing');
+  if(upcoming(it)) bits.push('Upcoming · out '+outDate(it.setDate));
+  if(it.basis==='listing' && !it.cn && it.best!=null) bits.push('no sales yet · lowest listing');
   if(it.number) bits.push('#'+it.number);
   if(it.variant) bits.push(it.variant);
   if(it.kind==='sealed' && it.packs) bits.push(it.packs+(it.packs===1?' pack':' packs'));
@@ -2321,7 +2350,7 @@ function makeSearch(input, list, kind, onPick){
       if(it.jp || it.cn){ const j=document.createElement('span'); j.className='jp'; j.textContent = it.cn ? ' · CN' : ' · JP'; sb.append(j); }
       const tags=document.createElement('div'); tags.className='tags'; tags.append(r, sb);
       mid.append(nm, tags);
-      const pr=document.createElement('div'); pr.className='pr'; pr.textContent = it.best!=null ? money(fromUsd(it.best)) : it.cn ? 'Tap for price' : '—'; if(it.best==null && it.cn){ pr.style.fontSize='12px'; pr.style.color='var(--muted)'; }
+      const pr=document.createElement('div'); pr.className='pr'; pr.textContent = it.best!=null ? money(fromUsd(it.best)) : it.cn ? 'Tap for price' : 'Price soon'; if(it.best==null){ pr.style.fontSize='12px'; pr.style.color='var(--muted)'; }
       li.append(thumb(it.id, it.kind==='sealed'), mid, pr); li.style.animationDelay = Math.min(k,12)*25+'ms';
       let sx=0, sy=0, moved=false;
       li.addEventListener('pointerdown', e=>{ sx=e.clientX; sy=e.clientY; moved=false; });
@@ -2415,7 +2444,7 @@ function paintProduct(){
   renderStack();
   $('prodCard').hidden = !prod;
   $('unitWrap').hidden = !(prod && prod.packs>1);
-  $('worthLine').hidden = !prod || manualOpen;
+  $('worthLine').hidden = !prod || (manualOpen && prod.usd!=null);
   $('manualWorth').hidden = !manualOpen;
   $('goManual').hidden = manualOpen;
   if(prod){
@@ -2438,6 +2467,11 @@ function paintProduct(){
       const ed = document.createElement('button'); ed.className='linkbtn'; ed.type='button'; ed.textContent='Use a different value';
       ed.addEventListener('click', ()=>{ $('worth').value = mainWorth().toFixed(2); worthSrc='self'; manualOpen=true; saveCheck(); paintProduct(); updateCheck(); $('worth').focus(); });
       wl.append(lead, b, src, ed);
+    } else {
+      const b = document.createElement('b'); b.textContent = prod.lang==='cn' ? 'No price yet' : soonText(prod);
+      const src = document.createElement('span'); src.className = 'src';
+      src.textContent = prod.lang==='cn' ? 'Enter a value below to check it.' : 'TCGplayer hasn’t priced it yet'+(upcoming(prod) ? ' (it isn’t out)' : '')+'. Enter a value below to check it now.';
+      wl.append(b, src);
     }
   }
   const wlab = $('worthLabel'); wlab.textContent = prod ? 'Your value for '+(prod.kind==='card' ? 'the card' : perPack() || prod.packs===1 ? '1 pack' : 'the whole '+noun(prod.name)) : 'What’s it worth?';
@@ -2476,7 +2510,7 @@ function renderStack(){
     const info = document.createElement('div'); info.className = 'info';
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name;
     const sub = document.createElement('div'); sub.className = 'sub';
-    sub.textContent = (x.set ? x.set+' · ' : '') + (x.usd!=null ? money(fromUsd(x.usd))+(x.qty>1 ? ' each · '+money(fromUsd(x.usd)*x.qty)+' total' : '') : 'no price yet');
+    sub.textContent = (x.set ? x.set+' · ' : '') + (x.usd!=null ? money(fromUsd(x.usd))+(x.qty>1 ? ' each · '+money(fromUsd(x.usd)*x.qty)+' total' : '') : 'price coming soon');
     info.append(nm, sub);
     const q = document.createElement('div'); q.className = 'qty';
     const btn = (t, label, fn, cls)=>{ const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', label); if(cls) b.className = cls; b.addEventListener('click', fn); return b; };
@@ -2761,7 +2795,7 @@ function renderSealed(){
     const info = document.createElement('div'); info.className = 'info';
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name;
     const sub = document.createElement('div'); sub.className = 'sub';
-    sub.textContent = (x.set ? x.set+' · ' : '') + (x.usd!=null ? money(fromUsd(x.usd))+(x.qty>1 ? ' each · '+money(fromUsd(x.usd)*x.qty)+' total' : ' today') : 'no price yet');
+    sub.textContent = (x.set ? x.set+' · ' : '') + (x.usd!=null ? money(fromUsd(x.usd))+(x.qty>1 ? ' each · '+money(fromUsd(x.usd)*x.qty)+' total' : ' today') : 'price coming soon');
     info.append(nm, sub);
     const q = document.createElement('div'); q.className = 'qty';
     const btn = (t, label, fn, cls)=>{ const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', label); if(cls) b.className = cls; b.addEventListener('click', fn); return b; };
@@ -3136,9 +3170,9 @@ function updateShow(){
   if($('showPic').dataset.id != it.id) showPic($('showPic'), it.id, false);
   $('showSub').textContent = [rarAbbr(it.rarity), it.variant, it.set, LANGN[it.lang]].filter(Boolean).join(' · ');
   const up = st.change!=null && st.change >= 0;
-  $('showBig').textContent = st.market!=null ? money(fromUsd(st.market)) : 'No price yet'; $('showBig').style.color = 'var(--fg)';
+  $('showBig').textContent = st.market!=null ? money(fromUsd(st.market)) : it.lang==='cn' ? 'No price yet' : 'Price coming soon'; $('showBig').style.color = 'var(--fg)';
   $('showLine').textContent = st.loading ? 'Getting 90 days of sales from TCGplayer…'
-    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold.toLocaleString('en-US')+' sold on TCGplayer in that time.' : '.');
+    : (st.change!=null ? (up ? 'Up ' : 'Down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : st.market==null && it.lang!=='cn' ? (upcoming(it) ? 'Out '+outDate(it.setDate)+'. TCGplayer prices start once it sells' : 'TCGplayer hasn’t priced this yet') : 'Today’s TCGplayer market price')+(st.sold ? ' · '+st.sold.toLocaleString('en-US')+' sold on TCGplayer in that time.' : '.');
   $('showSpark').innerHTML = sparkSvg(st.pts, up || st.change==null ? '#C8F23C' : '#FF6A55');
   const rows = $('showRows'); rows.textContent = '';
   const row = (k, v, cls)=>{ const d = document.createElement('div'); const a = document.createElement('span'); a.textContent = k; const b = document.createElement('span'); b.textContent = v; if(cls) b.className = cls; d.append(a, b); rows.append(d); };
@@ -3235,15 +3269,15 @@ function spotTicker(K){
   const {ctx, st, cA, INK, soft, faint, m, up, trend} = K;
   const chg = st.change==null ? null : Math.abs(st.change*100);
   const showG = chg==null && st.graded;
-  spotLabel(ctx, chg!=null ? (st.trimmed ? 'CHANGE '+st.periodCap : st.periodCap+' CHANGE') : showG ? show.grade.toUpperCase()+' · MY VALUE' : 'MARKET PRICE', 52, 952, faint);
-  const big = chg!=null ? (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%' : showG ? m(st.graded, 0) : st.market!=null ? m(fromUsd(st.market)) : '—';
+  spotLabel(ctx, chg!=null ? (st.trimmed ? 'CHANGE '+st.periodCap : st.periodCap+' CHANGE') : showG ? show.grade.toUpperCase()+' · MY VALUE' : st.market==null ? 'PRICE' : 'MARKET PRICE', 52, 952, faint);
+  const big = chg!=null ? (up ? '+' : '−')+(chg >= 100 ? Math.round(chg) : chg.toFixed(1))+'%' : showG ? m(st.graded, 0) : st.market!=null ? m(fromUsd(st.market)) : 'COMING SOON';
   spotFit(ctx, big, '400 #px Anton', 150, 400, 80); ctx.fillStyle = chg==null ? INK : trend; ctx.shadowColor = hexA(chg==null ? '#ffffff' : trend, .35); ctx.shadowBlur = 30; ctx.fillText(big, 48, 1100); ctx.shadowBlur = 0;
   if(st.pts.length){ ctx.font = '600 30px "Barlow Semi Condensed"'; ctx.fillStyle = INK;
     const a = m(fromUsd(st.pts[0][1])), b = m(st.market!=null ? fromUsd(st.market) : fromUsd(st.pts[st.pts.length-1][1])); ctx.fillText(a+'  →  '+b, 52, 1148); }
-  ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : showG ? 'Graded value, self-reported' : 'TCGplayer market price', 52, 1178);
+  ctx.font = '500 14px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(st.sold ? st.sold.toLocaleString('en-US')+' sold on TCGplayer' : showG ? 'Graded value, self-reported' : st.market==null ? (upcoming(st.it) ? 'Out '+outDate(st.it.setDate)+' · TCGplayer prices start at release' : 'Not priced on TCGplayer yet') : 'TCGplayer market price', 52, 1178);
   if(st.pts.length >= 2){ spotSpark(ctx, st.pts, 470, 950, 1024, 1150, cA, {start: true, fillDrop: 40});
     ctx.font = '600 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = faint; ctx.fillText(shortDate(st.pts[0][0]), 470, 1186); ctx.textAlign = 'right'; ctx.fillText('TODAY', 1024, 1186); ctx.textAlign = 'left'; spaced(ctx, 0); }
-  else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : 'No TCGplayer sales in the last 90 days.', 470, 1060); }
+  else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.fillText(st.loading ? 'Loading 90 days of sales…' : st.market==null ? '' : 'No TCGplayer sales in the last 90 days.', 470, 1060); }
   // three facts
   const facts = [];
   if(st.sales[0]) facts.push(['LAST SOLD', m(fromUsd(st.sales[0].p)), (COND[st.sales[0].cond]||'')+' · '+shortDate(st.sales[0].d)]);
@@ -3259,7 +3293,7 @@ function spotTicker(K){
 }
 const CONDCOL = {NM: '#7BE495', LP: '#E8D36A', MP: '#F4A259', HP: '#F2734E', DMG: '#E5484D', SEALED: '#9AA4FF'};
 // The picture for the share image: your own photo if you added one, otherwise the card from TCGplayer.
-function showArt(it){ return showPhoto && showPhotoImg.complete && showPhotoImg.naturalWidth ? {img: showPhotoImg, photo: true} : productArt(it.id, false); }
+function showArt(it){ return showPhoto && showPhotoImg.complete && showPhotoImg.naturalWidth ? {img: showPhotoImg, photo: true} : productArt(it.id, false) || (it.kind!=='sealed' && artFailed(it.id, false) ? placeholderArt(it) : null); }
 function compactMoney(v){ const a = Math.abs(v); return a >= 1e6 ? '$'+(v/1e6).toFixed(a >= 1e7 ? 0 : 1)+'M' : a >= 1e4 ? '$'+(v/1e3).toFixed(a >= 1e5 ? 0 : 1)+'K' : money(v, a >= 100 ? 0 : 2); }
 // Price watch: square post about how a card's price moved. Picture left, chart right, then / change / now underneath.
 function drawPriceWatch(st){
@@ -3311,7 +3345,7 @@ function drawPriceWatch(st){
       ctx.textAlign = align; ctx.font = '700 26px "Barlow Semi Condensed"'; ctx.fillStyle = trend; ctx.fillText(compactMoney(fromUsd(v)), q[0], y);
       ctx.font = '700 15px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(d, q[0], y + 20); ctx.textAlign = 'left'; };
     tagAt(a, startV, shortDate(st.pts[0][0]), 'left'); tagAt(b, nowV, 'TODAY', 'right');
-  } else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.textAlign = 'center'; ctx.fillText(st.loading ? 'Loading price history…' : 'No TCGplayer sales in this period.', CX0 + CW/2, CY0 + CH/2); ctx.textAlign = 'left'; }
+  } else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.textAlign = 'center'; ctx.fillText(st.loading ? 'Loading price history…' : upcoming(st.it) ? 'Out '+outDate(st.it.setDate)+'. Price history starts at release.' : 'No TCGplayer sales in this period.', CX0 + CW/2, CY0 + CH/2); ctx.textAlign = 'left'; }
   // name
   let fs = 40; ctx.font = '800 '+fs+'px Archivo'; while(ctx.measureText(it.name).width > W - 88 && fs > 26){ fs -= 2; ctx.font = '800 '+fs+'px Archivo'; }
   ctx.fillStyle = INK; ctx.fillText(it.name, 44, 732);
@@ -3322,13 +3356,13 @@ function drawPriceWatch(st){
   const cw = (W - 88)/3, mid = i => 44 + cw*i + cw/2;
   ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(44 + cw, 812, 1, 168); ctx.fillRect(44 + cw*2, 812, 1, 168);
   const col = (i, lab, val, valCol, note)=>{ ctx.textAlign = 'center'; ctx.font = '600 22px "Barlow Semi Condensed"'; spaced(ctx, 2); ctx.fillStyle = INK; ctx.fillText(lab, mid(i), 846); spaced(ctx, 0);
-    if(val === '—'){ val = 'No sales'; valCol = faint; }
-    let vs = val === 'No sales' ? 40 : 76; ctx.font = '800 '+vs+'px Archivo'; while(ctx.measureText(val).width > cw - 24 && vs > 36){ vs -= 2; ctx.font = '800 '+vs+'px Archivo'; }
-    ctx.fillStyle = valCol; ctx.fillText(val, mid(i), val === 'No sales' ? 915 : 930); ctx.font = '600 17px "Barlow Semi Condensed"'; ctx.fillStyle = soft; ctx.fillText(note, mid(i), 966); ctx.textAlign = 'left'; };
+    if(val === '—'){ val = upcoming(st.it) ? 'Not out' : 'No sales'; valCol = faint; }
+    let vs = (val === 'No sales' || val === 'Not out') ? 40 : 76; ctx.font = '800 '+vs+'px Archivo'; while(ctx.measureText(val).width > cw - 24 && vs > 36){ vs -= 2; ctx.font = '800 '+vs+'px Archivo'; }
+    ctx.fillStyle = valCol; ctx.fillText(val, mid(i), (val === 'No sales' || val === 'Not out') ? 915 : 930); ctx.font = '600 17px "Barlow Semi Condensed"'; ctx.fillStyle = soft; ctx.fillText(note, mid(i), 966); ctx.textAlign = 'left'; };
   const lime = '#C8F23C';
   col(0, st.agoCap, startV!=null ? m2(fromUsd(startV)) : '—', lime, has ? shortDate(st.pts[0][0]) : '');
   col(1, 'PRICE CHANGE', st.change==null ? '—' : (up ? '▲' : '▼')+Math.abs(st.change*100).toFixed(1)+'%', trend, st.sold ? st.sold.toLocaleString('en-US')+' sold' : '');
-  col(2, 'TODAY', nowV!=null ? m2(fromUsd(nowV)) : '—', lime, 'TCGplayer market');
+  col(2, 'TODAY', nowV!=null ? m2(fromUsd(nowV)) : 'SOON', lime, nowV!=null ? 'TCGplayer market' : upcoming(st.it) ? 'out '+outDate(st.it.setDate) : 'price coming');
   function m2(v){ return money(v, v >= 100 ? 0 : 2); }
   // footer
   ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText(((it.lang==='cn' ? 'CARDOS SOLD PRICES' : 'TCGPLAYER MARKET DATA')+'  ·  '+cur+'  ·  '+today).toUpperCase(), 44, H - 32);
@@ -3390,8 +3424,8 @@ function drawShowcase(st){
   // price tag hanging off the card (or slab)
   function drawTag(cx, cw){
     const tagV = st.graded || (st.market!=null ? fromUsd(st.market) : null);
-    if(tagV!=null){
-      const lab = st.graded ? 'MY '+show.grade.toUpperCase().replace(/ BLACK LABEL| PRISTINE/, '')+' VALUE' : 'MARKET PRICE', val = m(tagV);
+    {
+      const lab = st.graded ? 'MY '+show.grade.toUpperCase().replace(/ BLACK LABEL| PRISTINE/, '')+' VALUE' : tagV!=null ? 'MARKET PRICE' : upcoming(st.it) ? 'OUT '+outDate(st.it.setDate).toUpperCase() : 'PRICE', val = tagV!=null ? m(tagV) : 'SOON';
       ctx.font = '700 15px "JetBrains Mono"'; spaced(ctx, 3); const lw0 = ctx.measureText(lab).width; spaced(ctx, 0);
       ctx.font = '400 74px Anton'; const vw = ctx.measureText(val).width, tw2 = Math.max(vw + 100, lw0 + 100, 260), th = 150;
       ctx.save(); ctx.translate(Math.min(W - 40 - tw2/2, cx + cw/2 + tw2/2 - 46), CY + CH*0.8); ctx.rotate(0.08);
@@ -3509,7 +3543,7 @@ function topTitle(){
 function renderTop(){
   const has = topItems.length > 0;
   $('topOut').hidden = !has; $('topPreview').hidden = !has;
-  if(!has){ if(!$('topEmpty').textContent || top.kind==='set') $('topEmpty').textContent = top.kind==='set' && !top.set ? 'Pick a set. You’ll get its most valuable cards at today’s TCGplayer prices.' : 'Nothing to show for this list yet.'; $('topEmpty').hidden = false; return; }
+  if(!has){ if(!$('topEmpty').textContent || top.kind==='set') $('topEmpty').textContent = top.kind==='set' && !top.set ? 'Pick a set. You’ll get its most valuable cards at today’s TCGplayer prices.' : top.kind==='set' && top.set.date > todayISO() ? 'Prices coming soon. '+top.set.name+' is out '+outDate(top.set.date)+', and TCGplayer prices start once its cards sell.' : top.kind==='set' ? 'Prices coming soon. No card in this set has sold on TCGplayer yet.' : 'Nothing to show for this list yet.'; $('topEmpty').hidden = false; return; }
   $('topEmpty').hidden = true;
   const T = topTitle(); $('topHead').textContent = T.big.charAt(0)+T.big.slice(1).toLowerCase()+' · '+T.line.charAt(0)+T.line.slice(1).toLowerCase();
   const ol = $('topRows'); ol.textContent = '';
