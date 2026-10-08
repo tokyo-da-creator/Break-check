@@ -287,6 +287,7 @@ window.__noShare = true;
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }
     if(url.indexOf('/api/graded')===0) return realFetch(input, init);
+    if(url.indexOf('/api/worth')===0) return realFetch(input, init);
     if(url.indexOf('/api/fx')===0) return Promise.resolve(json({AUD: FX_AUD}));
     if(url.indexOf('/api/')===0) return Promise.resolve(json({error:'Not available here.'}, 503));
     return realFetch(input, init);
