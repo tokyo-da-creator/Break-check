@@ -150,7 +150,10 @@ window.__noShare = true;
       for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(e[5]==null) continue; /* ranked by real sales only: a lone asking price isn't a value */ rowsT.push(i); }
       rowsT.sort(function(a,b){ return c.items[b][5] - c.items[a][5]; });
       rowsT=rowsT.slice(0, n2+10);
-      return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT};
+      // the set's single booster pack, for "that's N packs" on the share image
+      var pk=null;
+      for(var j=0;j<c.items.length;j++){ var p=c.items[j]; if(p[7]!==si2 || p[8]!=='s' || p[9]!==1 || best(p[5],p[6])==null) continue; if(/sleeved|blister|pokemon center|bundle/i.test(p[1])) continue; pk=res(c,j); break; }
+      return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT, pack:pk};
     }
     if(q.get('featured')){
       var today=new Date().toISOString().slice(0,10);
@@ -273,8 +276,13 @@ window.__noShare = true;
           var b=search(c, U); b.builtAt=c.builtAt;
           var rows=b.rows||[]; delete b.rows;
           // Live prices for the first 15 results (the ones you can see); the rest update when picked.
-          var picked = /[?&]ids=/.test(url), n = picked || /[?&]settop=/.test(url) ? 40 : 15;
-          return withLive(c, rows.slice(0,n), b.results.slice(0,n)).then(function(){ return withCN(c, rows.slice(0,n), b.results.slice(0,n), picked); }).then(function(){ return json(b); });
+          var picked = /[?&]ids=/.test(url), settop = /[?&]settop=/.test(url), n = picked || settop ? 40 : 15;
+          // Top cards in a set: add each card's price 30 days ago (from the movers file) so the image can show the move
+          var mv = settop ? movers().then(function(m){
+            var at={}; (m.rows||[]).forEach(function(r){ at[r[0]+'|'+r[1]]=r; });
+            b.results.forEach(function(o){ var r=at[o.id+'|'+o.variant]; if(r && r[4]){ o.then=r[4]; o.sold=r[6]; } });
+          }, function(){}) : Promise.resolve();
+          return mv.then(function(){ return withLive(c, rows.slice(0,n), b.results.slice(0,n)); }).then(function(){ return withCN(c, rows.slice(0,n), b.results.slice(0,n), picked); }).then(function(){ return json(b); });
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }

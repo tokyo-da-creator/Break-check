@@ -885,7 +885,10 @@ header.top .tabs{margin-top:18px}
       for(var i=0;i<c.items.length;i++){ var e=c.items[i]; if(e[7]!==si2 || e[8]!=='c') continue; if(e[5]==null) continue; /* ranked by real sales only: a lone asking price isn't a value */ rowsT.push(i); }
       rowsT.sort(function(a,b){ return c.items[b][5] - c.items[a][5]; });
       rowsT=rowsT.slice(0, n2+10);
-      return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT};
+      // the set's single booster pack, for "that's N packs" on the share image
+      var pk=null;
+      for(var j=0;j<c.items.length;j++){ var p=c.items[j]; if(p[7]!==si2 || p[8]!=='s' || p[9]!==1 || best(p[5],p[6])==null) continue; if(/sleeved|blister|pokemon center|bundle/i.test(p[1])) continue; pk=res(c,j); break; }
+      return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT, pack:pk};
     }
     if(q.get('featured')){
       var today=new Date().toISOString().slice(0,10);
@@ -1008,8 +1011,13 @@ header.top .tabs{margin-top:18px}
           var b=search(c, U); b.builtAt=c.builtAt;
           var rows=b.rows||[]; delete b.rows;
           // Live prices for the first 15 results (the ones you can see); the rest update when picked.
-          var picked = /[?&]ids=/.test(url), n = picked || /[?&]settop=/.test(url) ? 40 : 15;
-          return withLive(c, rows.slice(0,n), b.results.slice(0,n)).then(function(){ return withCN(c, rows.slice(0,n), b.results.slice(0,n), picked); }).then(function(){ return json(b); });
+          var picked = /[?&]ids=/.test(url), settop = /[?&]settop=/.test(url), n = picked || settop ? 40 : 15;
+          // Top cards in a set: add each card's price 30 days ago (from the movers file) so the image can show the move
+          var mv = settop ? movers().then(function(m){
+            var at={}; (m.rows||[]).forEach(function(r){ at[r[0]+'|'+r[1]]=r; });
+            b.results.forEach(function(o){ var r=at[o.id+'|'+o.variant]; if(r && r[4]){ o.then=r[4]; o.sold=r[6]; } });
+          }, function(){}) : Promise.resolve();
+          return mv.then(function(){ return withLive(c, rows.slice(0,n), b.results.slice(0,n)); }).then(function(){ return withCN(c, rows.slice(0,n), b.results.slice(0,n), picked); }).then(function(){ return json(b); });
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }
@@ -1019,7 +1027,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791399757';
+(function(){ var BUILD='1791420404';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3409,14 +3417,17 @@ async function openTop(){
     const r = await fetch(url), d = await r.json();
     if(!r.ok) throw new Error(d.error || 'bad');
     let items = (d.results||[]).filter(x=>x.best!=null);
-    if(top.kind === 'set') items.sort((a,b)=>b.best - a.best);
-    else {
+    if(top.kind === 'set'){
+      items.sort((a,b)=>b.best - a.best);
+      // 30-day move, only where enough copies sold for the move to be real
+      items.forEach(x=>{ x.change = x.then && x.sold >= 12 ? x.best/x.then - 1 : null; });
+    } else {
       // re-measure against today's live price
       items.forEach(x=>{ if(x.then) x.change = x.best/x.then - 1; });
       if(top.kind === 'gain') items = items.filter(x=>x.change > 0).sort((a,b)=>b.change - a.change);
       if(top.kind === 'drop') items = items.filter(x=>x.change < 0).sort((a,b)=>a.change - b.change);
     }
-    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt};
+    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt, pack: d.pack || null};
     renderTop();
   }catch(e){ topItems = []; $('topEmpty').textContent = e.message && e.message !== 'bad' ? e.message : 'Couldn’t load this list. Try again in a moment.'; $('topOut').hidden = true; $('topPreview').hidden = true; }
 }
@@ -3440,7 +3451,7 @@ function renderTop(){
     const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : ''].filter(Boolean).join(' · ');
     mid.append(nm, sb);
     const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(x.best));
-    if(top.kind !== 'set'){ const ch = document.createElement('span'); ch.className = 'ch';
+    if(top.kind !== 'set' || x.change != null){ const ch = document.createElement('span'); ch.className = 'ch';
       ch.textContent = top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
     li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
   });
@@ -3450,62 +3461,185 @@ function renderTop(){
   drawTopSoon();
 }
 function drawTopSoon(){ clearTimeout(tTop); tTop = setTimeout(()=>{ const cv = drawTopList(); if(cv) $('topImg').src = cv.toDataURL('image/jpeg', 0.9); }, 200); }
+// Metal for the podium: rim gradient stops + glow colour
+const TOP_METAL = [
+  {name: 'gold',   glow: '#F5C84C', stops: ['#FFF4BF', '#F5C84C', '#9A6A12', '#FFE27A', '#B9861F']},
+  {name: 'silver', glow: '#DDE3EC', stops: ['#FFFFFF', '#D8DCE3', '#7D8692', '#F2F4F7', '#9AA3AF']},
+  {name: 'bronze', glow: '#E59A5E', stops: ['#FFD9BC', '#E09A62', '#83431A', '#F4B88A', '#A8602F']}
+];
+function topName(x){
+  let s = (x.name || '').replace(/\s*-\s*[A-Z]*\d+\/\d+/, '').replace(/\s*\(Delta Species\)/i, ' δ').replace(/\s*\(([^)]{17,})\)/g, '');
+  return s.trim();
+}
+function topSub(x){
+  const v = x.variant === 'Reverse' ? 'Reverse Holo' : x.variant && !/^normal$/i.test(x.variant) ? x.variant : '';
+  const num = x.number ? '#'+String(x.number).split('/')[0].replace(/^0+(?=\d)/, '') : '';
+  return (top.kind === 'set' ? [num, v, x.jp ? 'JP' : ''] : [shortSet(x.set).replace(/^Miscellaneous Cards.*/i, 'Promo'), num, v, x.jp ? 'JP' : '']).filter(Boolean).join(' · ');
+}
+function fitText(ctx, s, max){
+  if(ctx.measureText(s).width <= max) return s;
+  while(s.length > 1 && ctx.measureText(s+'…').width > max) s = s.slice(0, -1);
+  return s.trimEnd()+'…';
+}
+const topMoney = v => money(fromUsd(v), fromUsd(v) >= 100 ? 0 : 2);
+const topPct = c => (c >= 0 ? '▲' : '▼')+Math.abs(c*100).toFixed(Math.abs(c) >= 1 || Math.abs(c) < 0.1 ? 0 : 1).replace(/^0$/, '<1')+'%';
+// What the mascot says. Pack maths for a set (the whole point of Break Check), a one-liner for the movers lists.
+function topQuip(){
+  const a = topItems[0], per = top.period === 'month' ? 'this month' : 'this week';
+  if(top.kind === 'set'){
+    const tot = topItems.reduce((s, x)=>s + (x.best || 0), 0), pk = topMeta && topMeta.pack && topMeta.pack.best;
+    if(pk){ const n = Math.round(tot/pk); return ['All '+topItems.length+' together: '+topMoney(tot), 'That’s '+n.toLocaleString('en-US')+' packs at '+topMoney(pk)+'. Rip accordingly.']; }
+    return ['All '+topItems.length+' together: '+topMoney(tot), 'Pack maths says: buy the single.'];
+  }
+  if(top.kind === 'gain') return [topName(a)+' '+topPct(a.change)+' '+per, 'Somebody knew. Was it you?'];
+  if(top.kind === 'drop') return [topName(a)+' '+topPct(a.change)+' '+per, 'Buy the dip or catch a knife?'];
+  const sold = topItems.reduce((s, x)=>s + (x.sold || 0), 0);
+  return [sold.toLocaleString('en-US')+' copies sold '+per, 'The people have spoken.'];
+}
+function topBubble(ctx, x, y, maxW, lines, acc){
+  ctx.save(); ctx.textBaseline = 'alphabetic';
+  const f1 = '800 21px Archivo', f2 = '600 16px Archivo', padX = 20;
+  ctx.font = f1; let l1 = fitText(ctx, lines[0], maxW - padX*2); const w1 = ctx.measureText(l1).width;
+  ctx.font = f2; let l2 = fitText(ctx, lines[1], maxW - padX*2); const w2 = ctx.measureText(l2).width;
+  const w = Math.min(maxW, Math.max(w1, w2) + padX*2), h = 66, r = 16;
+  // tail toward the mascot on the left
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + 40); ctx.lineTo(x - 16, y + 30); ctx.lineTo(x, y + 22); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+  ctx.shadowColor = hexA(acc, .35); ctx.shadowBlur = 24; ctx.fillStyle = '#121214'; ctx.fill(); ctx.shadowBlur = 0;
+  ctx.lineWidth = 2; ctx.strokeStyle = hexA(acc, .9); ctx.stroke();
+  ctx.font = f1; ctx.fillStyle = '#F4F1EA'; ctx.fillText(l1, x + padX, y + 29);
+  ctx.font = f2; ctx.fillStyle = 'rgba(244,241,234,.66)'; ctx.fillText(l2, x + padX, y + 52);
+  ctx.restore();
+  return w;
+}
+// Holo sheen: a soft rainbow sweep plus one bright diagonal glint, clipped to the card
+function topFoil(ctx, X, Y, w, h, rad, s){
+  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip();
+  ctx.globalCompositeOperation = 'soft-light';
+  const g = ctx.createLinearGradient(X, Y, X + w, Y + h);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.28, 'rgba(255,110,200,'+(.55*s)+')'); g.addColorStop(.42, 'rgba(255,255,255,'+(.9*s)+')');
+  g.addColorStop(.52, 'rgba(110,220,255,'+(.6*s)+')'); g.addColorStop(.66, 'rgba(170,255,120,'+(.45*s)+')'); g.addColorStop(.85, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(X, Y, w, h);
+  ctx.globalCompositeOperation = 'screen';
+  const t = ctx.createLinearGradient(X, Y, X + w, Y + h*0.8);
+  t.addColorStop(.30, 'rgba(255,255,255,0)'); t.addColorStop(.36, 'rgba(255,255,255,'+(.22*s)+')'); t.addColorStop(.40, 'rgba(255,255,255,0)');
+  ctx.fillStyle = t; ctx.fillRect(X, Y, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+  // top-edge catch light
+  const e = ctx.createLinearGradient(0, Y, 0, Y + h*0.25); e.addColorStop(0, 'rgba(255,255,255,'+(.16*s)+')'); e.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = e; ctx.fillRect(X, Y, w, h*0.25);
+  ctx.restore();
+}
+function topCard(ctx, x, X, Y, w, h, metal, foilS){
+  const rad = Math.round(w*0.045), a = productArt(x.id, false);
+  // lift: contact shadow + long drop shadow
+  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#111';
+  ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 26; ctx.fill();
+  ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3; ctx.fill(); ctx.restore();
+  // layered glow for the podium: wide haze, mid bloom, tight rim
+  if(metal){ [[90, .22], [40, .45], [14, .8]].forEach(([b, al])=>{ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.shadowColor = hexA(metal.glow, al); ctx.shadowBlur = b; ctx.fillStyle = '#111'; ctx.fill(); ctx.restore(); }); }
+  if(a){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(w/iw, h/ih); ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
+  topFoil(ctx, X, Y, w, h, rad, foilS);
+  if(metal){
+    const g = ctx.createLinearGradient(X, Y, X + w, Y + h); metal.stops.forEach((c, i)=>g.addColorStop(i/(metal.stops.length-1), c));
+    rrect(ctx, X - 1, Y - 1, w + 2, h + 2, rad + 1); ctx.lineWidth = 5; ctx.strokeStyle = g; ctx.stroke();
+  } else { rrect(ctx, X, Y, w, h, rad); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.stroke(); }
+  return rad;
+}
+function topChip(ctx, x, cx, Y, big){
+  let t, col;
+  if(top.kind === 'sold'){ t = (x.sold || 0).toLocaleString('en-US')+' SOLD'; col = '#F4F1EA'; }
+  else if(x.change != null){ t = topPct(x.change)+(top.kind === 'set' ? ' 30D' : ''); col = x.change >= 0 ? '#3BE38A' : '#FF5A4E'; }
+  else return;
+  ctx.save(); ctx.font = '800 '+(big ? 19 : 15)+'px "Barlow Semi Condensed"'; spaced(ctx, .5);
+  const h = big ? 30 : 24, cw = ctx.measureText(t).width + (big ? 20 : 14);
+  const X = cx - cw/2; rrect(ctx, X, Y, cw, h, h/2); ctx.fillStyle = hexA(col, .1); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(col, .7); ctx.stroke();
+  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, cx, Y + h/2 + 1); ctx.restore();
+}
+function topMedal(ctx, cx, cy, r, k, metal){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r + 5, 0, Math.PI*2); ctx.fillStyle = '#07070A'; ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
+  const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r); metal.stops.forEach((c, i)=>g.addColorStop(i/(metal.stops.length-1), c));
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.78, 0, Math.PI*2); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke();
+  ctx.font = '400 '+Math.round(r*1.15)+'px Anton'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#141414'; ctx.fillText(String(k+1), cx, cy + r*0.06);
+  ctx.restore();
+}
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
-  const n = topItems.length, cols = 5, rows = Math.ceil(n/cols), W = 1200, gx = 40, gap = 14, tw = (W - gx*2 - gap*(cols-1))/cols, ch = tw*1.395, ph = 50, rh = ch + ph + 18;
-  const H0 = 236, H = Math.round(H0 + rows*rh + 64), cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d'), INK = '#F4F1EA', soft = 'rgba(242,239,232,.62)', faint = 'rgba(242,239,232,.4)', rnd = bcRand(n*31 + 7);
-  const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : ['#C8F23C'];
-  ctx.fillStyle = '#07070A'; ctx.fillRect(0, 0, W, H);
-  if(lead){ const im = lead.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(W/iw, H/ih)*1.2; ctx.drawImage(softBackdrop(im, topItems[0].id), (W - iw*k)/2, (H - ih*k)/2, iw*k, ih*k); }
-  const fade = ctx.createLinearGradient(0, 0, 0, H); fade.addColorStop(0, 'rgba(7,7,10,.45)'); fade.addColorStop(.25, 'rgba(7,7,10,.72)'); fade.addColorStop(1, 'rgba(7,7,10,.9)'); ctx.fillStyle = fade; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.globalAlpha = .045; ctx.strokeStyle = '#fff'; for(let x=-H; x<W; x+=24){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H*0.6, H); ctx.stroke(); } ctx.restore();
-  // header
-  ctx.textBaseline = 'alphabetic';
-  if(brandIcon.complete && brandIcon.naturalWidth) ctx.drawImage(brandIcon, gx, 30, 52, 52);
-  ctx.font = '400 30px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', gx + 62, 66); spaced(ctx, 0);
-  ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = cA; ctx.fillText('TOP LIST · '+today, gx + 64, 84); spaced(ctx, 0);
-  if(creatorOn()) drawCreator(ctx, W - gx, 32, 48, {align: 'right', font: '700 24px Archivo', ring: cA});
+  const n = topItems.length, W = 1200, gx = 40, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(n*31 + 7);
+  const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : [LIME];
+  // podium geometry
+  const pod = Math.min(3, n), w1 = 330, h1 = Math.round(w1*1.395), w2 = 268, h2 = Math.round(w2*1.395), pgap = 46;
+  const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? 40 : 0;
+  const Y0 = 262, top1 = Y0 + 58 + cb, floor = top1 + h1, podEnd = floor + 112;
+  // the rest
+  const rest = n - pod, cols = rest <= 7 ? Math.max(rest, 1) : 6, rows = Math.ceil(rest/cols), gap = 16;
+  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = tw*1.395, cs = chips ? 32 : 0, rh = 34 + cs + th + 64;
+  const G0 = podEnd + (rest ? 56 : 0), H = Math.round(G0 + rows*rh + 70);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  // background: solid near-black, one spotlight in the lead card's colour, a floor pool under the podium
+  ctx.fillStyle = '#060608'; ctx.fillRect(0, 0, W, H);
+  const sp = ctx.createRadialGradient(W/2, top1 + h1*0.35, 20, W/2, top1 + h1*0.35, 620); sp.addColorStop(0, hexA(cA, .30)); sp.addColorStop(.45, hexA(cA, .10)); sp.addColorStop(1, hexA(cA, 0));
+  ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H);
+  const beam = ctx.createLinearGradient(0, 0, 0, floor); beam.addColorStop(0, 'rgba(255,255,255,.07)'); beam.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save(); ctx.beginPath(); ctx.moveTo(W/2 - 70, 0); ctx.lineTo(W/2 + 70, 0); ctx.lineTo(W/2 + 420, floor); ctx.lineTo(W/2 - 420, floor); ctx.closePath(); ctx.fillStyle = beam; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(W/2, floor + 6); ctx.scale(1, 0.09); const fl = ctx.createRadialGradient(0, 0, 0, 0, 0, 520); fl.addColorStop(0, hexA(cA, .55)); fl.addColorStop(.5, hexA(cA, .12)); fl.addColorStop(1, hexA(cA, 0)); ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(0, 0, 520, 0, Math.PI*2); ctx.fill(); ctx.restore();
+  // header: mascot, wordmark, and the mascot talking
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  if(brandIcon.complete && brandIcon.naturalWidth){ ctx.save(); ctx.shadowColor = 'rgba(140,90,255,.45)'; ctx.shadowBlur = 22; ctx.drawImage(brandIcon, gx - 4, 22, 72, 72); ctx.restore(); }
+  ctx.font = '400 32px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', gx + 80, 60); const wm = ctx.measureText('BREAK CHECK').width; spaced(ctx, 0);
+  ctx.font = '700 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = LIME; ctx.fillText('TOP LIST · '+today, gx + 82, 82); spaced(ctx, 0);
+  let crW = 0; if(creatorOn()){ ctx.font = '700 24px Archivo'; crW = 48 + 14 + ctx.measureText('@'+creator.handle).width; drawCreator(ctx, W - gx, 34, 48, {align: 'right', font: '700 24px Archivo', ring: LIME}); }
+  const bx = gx + 80 + Math.max(wm, 250) + 34;
+  topBubble(ctx, bx, 26, Math.min(470, W - gx - crW - 30 - bx), topQuip(), LIME);
+  // title
   const T = topTitle();
   ctx.textAlign = 'center';
-  ctx.font = '400 92px Anton'; spaced(ctx, 4); const g = ctx.createLinearGradient(0, 100, 0, 190); g.addColorStop(0, '#FFFFFF'); g.addColorStop(1, '#D9D4C8'); ctx.fillStyle = g;
-  ctx.shadowColor = hexA(cA, .45); ctx.shadowBlur = 30; ctx.fillText(T.big, W/2, 176); ctx.shadowBlur = 0; spaced(ctx, 0);
-  let fs = 30; ctx.font = '800 '+fs+'px Archivo'; while(ctx.measureText(T.line).width > W - 120 && fs > 18){ fs -= 1; ctx.font = '800 '+fs+'px Archivo'; }
-  ctx.fillStyle = cA; ctx.fillText(T.line, W/2, 214);
-  ctx.textAlign = 'left';
-  // tiles
-  const RING = ['#F5C84C', '#D8DCE3', '#E09A62'];
-  topItems.forEach((x, k)=>{
-    const c = k % cols, r = Math.floor(k / cols);
-    // centre a short last row
-    const inRow = r === rows - 1 ? n - r*cols : cols, off = (cols - inRow)*(tw + gap)/2;
-    const X = gx + off + c*(tw + gap), Y = H0 + r*rh;
+  ctx.font = '400 96px Anton'; spaced(ctx, 4); const tg = ctx.createLinearGradient(0, 120, 0, 200); tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#CFC9BC'); ctx.fillStyle = tg;
+  ctx.shadowColor = hexA(cA, .5); ctx.shadowBlur = 36; ctx.fillText(T.big, W/2, 196); ctx.shadowBlur = 0; spaced(ctx, 0);
+  let fs = 26; ctx.font = '800 '+fs+'px Archivo'; spaced(ctx, 2); while(ctx.measureText(T.line).width > W - 140 && fs > 16){ fs -= 1; ctx.font = '800 '+fs+'px Archivo'; }
+  ctx.fillStyle = LIME; ctx.fillText(T.line, W/2, 236); spaced(ctx, 0);
+  // podium: #2 left, #1 centre, #3 right, bottoms on one floor
+  const slots = [{k: 0, X: (W - w1)/2, w: w1, h: h1}, {k: 1, X: (W - w1)/2 - pgap - w2, w: w2, h: h2}, {k: 2, X: (W + w1)/2 + pgap, w: w2, h: h2}].slice(0, pod);
+  slots.sort((a, b)=>(a.k === 0) - (b.k === 0)).forEach(s=>{   // #1 drawn last so its glow sits on top
+    const x = topItems[s.k], metal = TOP_METAL[s.k], big = s.k === 0, Y = floor - s.h, cx = s.X + s.w/2;
     // price
-    ctx.textAlign = 'center'; let pf = 34; const pv = money(fromUsd(x.best), x.best >= 1000 ? 0 : 2); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 8 && pf > 20){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
-    ctx.fillStyle = INK; ctx.fillText(pv, X + tw/2, Y + 36); ctx.textAlign = 'left';
-    const cy = Y + ph, a = productArt(x.id, false), ring = RING[k];
-    ctx.save(); if(ring){ ctx.shadowColor = hexA(ring, .7); ctx.shadowBlur = 28; } else { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; }
-    rrect(ctx, X, cy, tw, ch, 10); ctx.fillStyle = '#111'; ctx.fill(); ctx.restore();
-    if(a){ ctx.save(); rrect(ctx, X, cy, tw, ch, 10); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, kk = Math.max(tw/iw, ch/ih); ctx.drawImage(im, X + (tw - iw*kk)/2, cy + (ch - ih*kk)/2, iw*kk, ih*kk); ctx.restore(); }
-    rrect(ctx, X, cy, tw, ch, 10); ctx.lineWidth = ring ? 4 : 1.5; ctx.strokeStyle = ring || 'rgba(255,255,255,.22)'; ctx.stroke();
-    // rank badge
-    ctx.font = '400 30px Anton'; const rt = '#'+(k+1), rw = ctx.measureText(rt).width + 22;
-    rrect(ctx, X + tw - rw - 6, cy + ch - 46, rw, 40, 8); ctx.fillStyle = ring || '#0B0B0C'; ctx.fill();
-    ctx.fillStyle = ring ? '#0B0B0C' : INK; ctx.textAlign = 'center'; ctx.fillText(rt, X + tw - rw/2 - 6, cy + ch - 15); ctx.textAlign = 'left';
-    // change chip
-    if(top.kind !== 'set'){
-      const t = top.kind === 'sold' ? x.sold+' SOLD' : (x.change >= 0 ? '▲' : '▼')+Math.abs(x.change*100).toFixed(x.change*100 >= 100 ? 0 : 1)+'%';
-      const col = top.kind === 'sold' ? '#F4F1EA' : x.change >= 0 ? '#3BE38A' : '#FF5A4E';
-      ctx.font = '800 18px "Barlow Semi Condensed"'; const cw = ctx.measureText(t).width + 18;
-      rrect(ctx, X + 6, cy + 6, cw, 28, 14); ctx.fillStyle = 'rgba(7,7,10,.82)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(col, .7); ctx.stroke();
-      ctx.fillStyle = col; ctx.fillText(t, X + 15, cy + 26);
-    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = big ? 54 : 42; const pv = topMoney(x.best);
+    ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > s.w && pf > 24){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
+    ctx.fillStyle = INK; ctx.shadowColor = hexA(metal.glow, big ? .55 : .3); ctx.shadowBlur = big ? 26 : 14; ctx.fillText(pv, cx, Y - 18 - cb); ctx.shadowBlur = 0;
+    topCard(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
+    topChip(ctx, x, cx, Y - 46, true);
+    topMedal(ctx, cx, floor, big ? 30 : 25, s.k, metal);
+    // label
+    ctx.textAlign = 'center'; ctx.font = '800 '+(big ? 24 : 20)+'px Archivo'; ctx.fillStyle = INK; ctx.fillText(fitText(ctx, topName(x), s.w + 30), cx, floor + (big ? 66 : 62));
+    ctx.font = '700 '+(big ? 14 : 13)+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = hexA(metal.glow, .9); ctx.fillText(fitText(ctx, topSub(x).toUpperCase(), s.w + 30), cx, floor + (big ? 90 : 84)); spaced(ctx, 0);
   });
+  // divider into the rest of the list
+  if(rest){
+    const dy = podEnd + 18; ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 4); ctx.textAlign = 'center'; const lab = '#4 — #'+n, lw = ctx.measureText(lab).width;
+    ctx.fillStyle = faint; ctx.fillText(lab, W/2, dy + 5); spaced(ctx, 0);
+    [[gx, W/2 - lw/2 - 18], [W/2 + lw/2 + 18, W - gx]].forEach(([a, b], i)=>{ const g = ctx.createLinearGradient(a, 0, b, 0); g.addColorStop(i ? 0 : 1, 'rgba(255,255,255,.22)'); g.addColorStop(i ? 1 : 0, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(a, dy, b - a, 1); });
+  }
+  for(let j=0; j<rest; j++){
+    const k = j + pod, x = topItems[k], c = j % cols, r = Math.floor(j / cols), inRow = r === rows - 1 ? rest - r*cols : cols;
+    const X = (W - (inRow*tw + (inRow-1)*gap))/2 + c*(tw + gap), Y = G0 + r*rh, cx = X + tw/2;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = 30; const pv = topMoney(x.best); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 4 && pf > 18){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
+    ctx.fillStyle = INK; ctx.fillText(pv, cx, Y + 26);
+    topChip(ctx, x, cx, Y + 36, false);
+    const cy = Y + 36 + cs; topCard(ctx, x, X, cy, tw, th, null, .55);
+    // rank tab hanging off the bottom-right
+    ctx.font = '400 20px Anton'; const rt = '#'+(k+1), rw = ctx.measureText(rt).width + 16;
+    rrect(ctx, X + tw - rw - 6, cy + th - 16, rw, 28, 7); ctx.fillStyle = '#0B0B0C'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.stroke();
+    ctx.fillStyle = INK; ctx.fillText(rt, X + tw - rw/2 - 6, cy + th + 5);
+    ctx.font = '700 15px Archivo'; ctx.fillStyle = INK; ctx.fillText(fitText(ctx, topName(x), tw + 8), cx, cy + th + 34);
+    ctx.font = '600 11px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(fitText(ctx, topSub(x).toUpperCase(), tw + 8), cx, cy + th + 52);
+  }
   // footer
-  ctx.font = '600 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
+  ctx.textAlign = 'left'; ctx.font = '700 14px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
   const foot = top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
-  ctx.fillText(foot, gx, H - 26); ctx.textAlign = 'right'; ctx.fillText('POKESNIPR.COM', W - gx, H - 26); ctx.textAlign = 'left'; spaced(ctx, 0);
-  grainVignette(ctx, rnd, .02, .35);
+  ctx.fillText(foot, gx, H - 28); ctx.textAlign = 'right'; ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, H - 28); ctx.textAlign = 'left'; spaced(ctx, 0);
+  grainVignette(ctx, rnd, .022, .45);
   return cv;
 }
 $('saveTop').addEventListener('click', async ()=>{ const cv = drawTopList(); if(cv) save(cv, 'top-'+top.kind+'-'+(top.set ? top.set.i : top.period)+'.jpg', $('statusTop'), 'image/jpeg'); });
