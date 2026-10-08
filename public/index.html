@@ -617,6 +617,7 @@ header.top .tabs{margin-top:18px}
         <button class="chip" type="button" data-k="gain">Biggest gainers</button>
         <button class="chip" type="button" data-k="drop">Biggest drops</button>
         <button class="chip" type="button" data-k="sold">Most sold</button>
+        <button class="chip" type="button" data-k="graded">Top graded sales</button>
       </div>
     </div>
     <div class="step" id="topSetStep">
@@ -1038,13 +1039,14 @@ header.top .tabs{margin-top:18px}
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }
+    if(url.indexOf('/api/graded')===0) return realFetch(input, init);
     return realFetch(input, init);
   };
   cat();
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791480583';
+(function(){ var BUILD='1791482119';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3443,7 +3445,7 @@ updateShow();
 // ---------- top lists: most valuable in a set, biggest gainers / drops, most sold ----------
 let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: ''}, store.get('top1') || {});
 let topItems = [], topMeta = null, tTop;
-const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold'};
+const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold', graded: 'Highest graded sales'};
 function saveTop(){ store.set('top1', top); }
 function paintTopUI(){
   document.querySelectorAll('#topKinds .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.k===top.kind));
@@ -3482,12 +3484,14 @@ async function openTop(){
   if(top.kind === 'set' && (!top.set || top.set.game !== game)){ top.set = null; paintTopUI(); topItems = []; renderTop(); findSets(); return; }
   $('topEmpty').hidden = false; $('topEmpty').textContent = 'Getting today’s prices…'; $('topOut').hidden = true; $('topPreview').hidden = true;
   const want = top.n, url = top.kind === 'set' ? '/api/search?settop='+top.set.i+'&n='+want
+    : top.kind === 'graded' ? '/api/graded?period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '')
     : '/api/search?movers='+top.kind+'&period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '');
   try{
     const r = await fetch(url), d = await r.json();
     if(!r.ok) throw new Error(d.error || 'bad');
-    let items = (d.results||[]).filter(x=>x.best!=null);
-    if(top.kind === 'set'){
+    let items = (d.results||[]).filter(x=>top.kind === 'graded' ? x.sale != null : x.best != null);
+    if(top.kind === 'graded') items.sort((a,b)=>b.sale - a.sale);
+    else if(top.kind === 'set'){
       items.sort((a,b)=>b.best - a.best);
       // 30-day move, only where enough copies sold for the move to be real
       items.forEach(x=>{ x.change = x.then && x.sold >= 12 ? x.best/x.then - 1 : null; });
@@ -3497,7 +3501,7 @@ async function openTop(){
       if(top.kind === 'gain') items = items.filter(x=>x.change > 0).sort((a,b)=>b.change - a.change);
       if(top.kind === 'drop') items = items.filter(x=>x.change < 0).sort((a,b)=>a.change - b.change);
     }
-    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt, pack: d.pack || null};
+    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt, pack: d.pack || null, source: d.source || ''};
     renderTop();
   }catch(e){ topItems = []; $('topEmpty').textContent = e.message && e.message !== 'bad' ? e.message : 'Couldn’t load this list. Try again in a moment.'; $('topOut').hidden = true; $('topPreview').hidden = true; }
 }
@@ -3520,9 +3524,9 @@ function renderTop(){
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name + (x.number ? ' '+x.number : '');
     const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : ''].filter(Boolean).join(' · ');
     mid.append(nm, sb);
-    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(x.best));
+    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(top.kind === 'graded' ? x.sale : x.best));
     if(top.kind !== 'set' || x.change != null){ const ch = document.createElement('span'); ch.className = 'ch';
-      ch.textContent = top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
+      ch.textContent = top.kind === 'graded' ? x.grader+' '+x.grade : top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' || top.kind === 'graded' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
     li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
   });
   $('topNote').textContent = top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
@@ -3541,9 +3545,10 @@ function topName(x){
   let s = (x.name || '').replace(/\s*-\s*[A-Z]*\d+\/\d+/, '').replace(/\s*\(Delta Species\)/i, ' δ').replace(/\s*\(([^)]{17,})\)/g, '');
   return s.trim();
 }
-function topSub(x){
+function topSub(x, short){
   const v = x.variant === 'Reverse' ? 'Reverse Holo' : x.variant && !/^normal$/i.test(x.variant) ? x.variant : '';
   const num = x.number ? '#'+String(x.number).split('/')[0].replace(/^0+(?=\d)/, '') : '';
+  if(top.kind === 'graded') return [x.grader+' '+x.grade, soldWhen(x), short ? '' : x.venue].filter(Boolean).join(' · ');
   return (top.kind === 'set' ? [num, v, x.jp ? 'JP' : ''] : [shortSet(x.set).replace(/^Miscellaneous Cards.*/i, 'Promo'), num, v, x.jp ? 'JP' : '']).filter(Boolean).join(' · ');
 }
 function fitText(ctx, s, max){
@@ -3561,6 +3566,7 @@ function topQuip(){
     if(pk){ const n = Math.round(tot/pk); return ['All '+topItems.length+' together: '+topMoney(tot), 'That’s '+n.toLocaleString('en-US')+' packs at '+topMoney(pk)+'. Rip accordingly.']; }
     return ['All '+topItems.length+' together: '+topMoney(tot), 'Pack maths says: buy the single.'];
   }
+  if(top.kind === 'graded'){ const m = a.best ? a.sale/a.best : 0; return [topName(a)+' '+a.grader+' '+a.grade+': '+topMoney(a.sale), m >= 1.5 ? 'That’s '+(m >= 10 ? Math.round(m) : m.toFixed(1))+'× the raw price. Grade your hits.' : 'Slab tax: barely. Keep it raw.']; }
   if(top.kind === 'gain') return [topName(a)+' '+topPct(a.change)+' '+per, 'Somebody knew. Was it you?'];
   if(top.kind === 'drop') return [topName(a)+' '+topPct(a.change)+' '+per, 'Buy the dip or catch a knife?'];
   const sold = topItems.reduce((s, x)=>s + (x.sold || 0), 0);
@@ -3618,7 +3624,8 @@ function topCard(ctx, x, X, Y, w, h, metal, foilS){
 }
 function topChip(ctx, x, cx, Y, big){
   let t, col;
-  if(top.kind === 'sold'){ t = (x.sold || 0).toLocaleString('en-US')+' SOLD'; col = '#F4F1EA'; }
+  if(top.kind === 'graded'){ if(!x.best) return; const m = x.sale/x.best; t = (m >= 10 ? Math.round(m) : m.toFixed(1))+'× RAW'; col = '#C6FF3D'; }
+  else if(top.kind === 'sold'){ t = (x.sold || 0).toLocaleString('en-US')+' SOLD'; col = '#F4F1EA'; }
   else if(x.change != null){ t = topPct(x.change)+(top.kind === 'set' ? ' 30D' : ''); col = x.change >= 0 ? '#3BE38A' : '#FF5A4E'; }
   else return;
   ctx.save(); ctx.font = '800 '+(big ? 19 : 15)+'px "Barlow Semi Condensed"'; spaced(ctx, .5);
@@ -3635,17 +3642,74 @@ function topMedal(ctx, cx, cy, r, k, metal){
   ctx.font = '400 '+Math.round(r*1.15)+'px Anton'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#141414'; ctx.fillText(String(k+1), cx, cy + r*0.06);
   ctx.restore();
 }
+// ---------- graded: each card in a slab ----------
+const GRADERS = {PSA: '#E8433F', BGS: '#C9CED6', 'BGS BL': '#F5C84C', CGC: '#3D8BFF', SGC: '#2FD39A', TAG: '#C6FF3D'};
+const GRADE_WORD = {10: 'GEM MINT', 9.5: 'GEM MINT', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7: 'NM'};
+const graderKey = x => x.grader === 'BGS' && /black/i.test(x.label || '') ? 'BGS BL' : x.grader;
+const slabDims = w => { const m = Math.round(w*0.055), lh = Math.round(w*(w > 220 ? 0.27 : 0.25)), pad = Math.round(w*0.04), cw = w - 2*m - 2*pad, ch = Math.round(cw*1.395); return {m, lh, pad, cw, ch, h: m + lh + m + ch + pad*2 + m}; };
+const pieceH = w => top.kind === 'graded' ? slabDims(w).h : Math.round(w*1.395);
+const pieceVal = x => top.kind === 'graded' ? x.sale : x.best;
+function topPiece(ctx, x, X, Y, w, h, metal, foilS){ return top.kind === 'graded' ? topSlab(ctx, x, X, Y, w, h, metal) : topCard(ctx, x, X, Y, w, h, metal, foilS); }
+function topSlab(ctx, x, X, Y, w, h, metal){
+  const d = slabDims(w), rad = Math.round(w*0.05), acc = GRADERS[graderKey(x)] || '#F4F1EA', big = w > 220;
+  // lift + podium glow, same as the raw cards
+  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#0d0d10';
+  ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 44; ctx.shadowOffsetY = 28; ctx.fill(); ctx.shadowBlur = 6; ctx.shadowOffsetY = 3; ctx.fill(); ctx.restore();
+  if(metal){ [[90, .2], [40, .4], [14, .7]].forEach(([b, al])=>{ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.shadowColor = hexA(metal.glow, al); ctx.shadowBlur = b; ctx.fillStyle = '#0d0d10'; ctx.fill(); ctx.restore(); }); }
+  // acrylic body: smoky clear plastic
+  const body = ctx.createLinearGradient(X, Y, X + w, Y + h); body.addColorStop(0, 'rgba(255,255,255,.16)'); body.addColorStop(.5, 'rgba(255,255,255,.07)'); body.addColorStop(1, 'rgba(255,255,255,.12)');
+  rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#121216'; ctx.fill(); ctx.fillStyle = body; ctx.fill();
+  // label
+  const lx = X + d.m, ly = Y + d.m, lw = w - 2*d.m, lr = Math.round(rad*0.55);
+  ctx.save(); rrect(ctx, lx, ly, lw, d.lh, lr); ctx.clip();
+  const lg = ctx.createLinearGradient(0, ly, 0, ly + d.lh); lg.addColorStop(0, '#1B1B20'); lg.addColorStop(1, '#0E0E11'); ctx.fillStyle = lg; ctx.fillRect(lx, ly, lw, d.lh);
+  ctx.fillStyle = acc; ctx.fillRect(lx, ly, Math.max(5, w*0.02), d.lh);                          // grader colour strip
+  ctx.globalAlpha = .06; ctx.fillStyle = '#fff'; for(let i = 0; i < lw; i += 6) ctx.fillRect(lx + i, ly, 1, d.lh); ctx.globalAlpha = 1;   // fine security lines
+  ctx.restore();
+  rrect(ctx, lx, ly, lw, d.lh, lr); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(acc, .55); ctx.stroke();
+  // grade block on the right
+  const gs = String(x.grade), gw = d.lh*(gs.length > 2 ? 1.2 : 1.0), gx0 = lx + lw - gw;
+  ctx.save(); rrect(ctx, gx0, ly, gw, d.lh, lr); ctx.clip(); const gg = ctx.createLinearGradient(gx0, ly, gx0, ly + d.lh); gg.addColorStop(0, hexA(acc, .28)); gg.addColorStop(1, hexA(acc, .08)); ctx.fillStyle = gg; ctx.fillRect(gx0, ly, gw, d.lh); ctx.restore();
+  ctx.fillStyle = hexA(acc, .5); ctx.fillRect(gx0, ly + d.lh*0.14, 1.5, d.lh*0.72);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '400 '+Math.round(d.lh*(big ? 0.58 : 0.62))+'px Anton'; ctx.fillStyle = acc; ctx.shadowColor = hexA(acc, .6); ctx.shadowBlur = 14; ctx.fillText(gs, gx0 + gw/2, ly + d.lh*(big ? 0.64 : 0.74)); ctx.shadowBlur = 0;
+  if(big) ctx.font = '700 '+Math.max(8, Math.round(d.lh*0.12))+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.75)'; if(big) ctx.fillText(/black/i.test(x.label || '') ? 'BLACK LBL' : /pristine/i.test(x.label || '') ? 'PRISTINE' : (GRADE_WORD[x.grade] || ''), gx0 + gw/2, ly + d.lh*0.86); spaced(ctx, 0);
+  // grader + card text on the left
+  const tx = lx + Math.max(5, w*0.02) + d.lh*0.16, tmax = gx0 - tx - 8; ctx.textAlign = 'left';
+  ctx.font = '400 '+Math.round(d.lh*(big ? 0.26 : 0.34))+'px Anton'; spaced(ctx, 2); ctx.fillStyle = '#F4F1EA'; ctx.fillText(x.grader, tx, ly + d.lh*(big ? 0.34 : 0.44)); spaced(ctx, 0);
+  if(big){
+    ctx.font = '700 '+Math.round(d.lh*0.17)+'px Archivo'; ctx.fillStyle = 'rgba(244,241,234,.9)'; ctx.fillText(fitText(ctx, topName(x), tmax), tx, ly + d.lh*0.6);
+    ctx.font = '600 '+Math.round(d.lh*0.115)+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.5)'; ctx.fillText(fitText(ctx, (shortSet(x.set)+(x.number ? ' #'+String(x.number).split('/')[0] : '')).toUpperCase(), tmax), tx, ly + d.lh*0.8); spaced(ctx, 0);
+  } else {
+    ctx.font = '600 '+Math.max(8, Math.round(d.lh*0.15))+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.5)'; ctx.fillText(fitText(ctx, x.number ? '#'+String(x.number).split('/')[0] : '', tmax), tx, ly + d.lh*0.74); spaced(ctx, 0);
+  }
+  // card window: a recessed bed with the card floating in it
+  const wx = X + d.m, wy = ly + d.lh + d.m, ww = w - 2*d.m, wh = d.ch + d.pad*2;
+  rrect(ctx, wx, wy, ww, wh, lr); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.stroke();
+  const cx0 = wx + d.pad, cy0 = wy + d.pad, crad = Math.round(d.cw*0.045), a = productArt(x.id, false);
+  ctx.save(); rrect(ctx, cx0, cy0, d.cw, d.ch, crad); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4; ctx.fillStyle = '#111'; ctx.fill(); ctx.restore();
+  if(a){ ctx.save(); rrect(ctx, cx0, cy0, d.cw, d.ch, crad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(d.cw/iw, d.ch/ih); ctx.drawImage(im, cx0 + (d.cw - iw*k)/2, cy0 + (d.ch - ih*k)/2, iw*k, ih*k); ctx.restore(); }
+  topFoil(ctx, cx0, cy0, d.cw, d.ch, crad, big ? .7 : .45);
+  // plastic over everything: one long glare streak, edge bevel, rim
+  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); ctx.globalCompositeOperation = 'screen';
+  const gl = ctx.createLinearGradient(X, Y, X + w, Y + h*0.7); gl.addColorStop(.18, 'rgba(255,255,255,0)'); gl.addColorStop(.26, 'rgba(255,255,255,.16)'); gl.addColorStop(.31, 'rgba(255,255,255,.05)'); gl.addColorStop(.36, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl; ctx.fillRect(X, Y, w, h); ctx.restore();
+  rrect(ctx, X + 3, Y + 3, w - 6, h - 6, rad - 2); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.stroke();
+  if(metal){ const g = ctx.createLinearGradient(X, Y, X + w, Y + h); metal.stops.forEach((c, i)=>g.addColorStop(i/(metal.stops.length-1), c)); rrect(ctx, X - 1, Y - 1, w + 2, h + 2, rad + 1); ctx.lineWidth = 4; ctx.strokeStyle = g; ctx.stroke(); }
+  else { rrect(ctx, X, Y, w, h, rad); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.38)'; ctx.stroke(); }
+}
+const soldWhen = x => x.soldAt ? 'SOLD '+new Date(x.soldAt+'T12:00:00').toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}).toUpperCase() : 'SOLD';
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
   const n = topItems.length, W = 1200, gx = 40, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(n*31 + 7);
   const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : [LIME];
   // podium geometry
-  const pod = Math.min(3, n), w1 = 330, h1 = Math.round(w1*1.395), w2 = 268, h2 = Math.round(w2*1.395), pgap = 46;
+  const pod = Math.min(3, n), w1 = 330, h1 = pieceH(w1), w2 = 268, h2 = pieceH(w2), pgap = 46;
   const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? 40 : 0;
   const Y0 = 262, top1 = Y0 + 58 + cb, floor = top1 + h1, podEnd = floor + 112;
   // the rest
   const rest = n - pod, cols = rest <= 7 ? Math.max(rest, 1) : 6, rows = Math.ceil(rest/cols), gap = 16;
-  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = tw*1.395, cs = chips ? 32 : 0, rh = 34 + cs + th + 64;
+  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = pieceH(tw), cs = chips ? 32 : 0, rh = 34 + cs + th + 64;
   const G0 = podEnd + (rest ? 56 : 0), H = Math.round(G0 + rows*rh + 70);
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   // background: solid near-black, one spotlight in the lead card's colour, a floor pool under the podium
@@ -3675,10 +3739,10 @@ function drawTopList(){
   slots.sort((a, b)=>(a.k === 0) - (b.k === 0)).forEach(s=>{   // #1 drawn last so its glow sits on top
     const x = topItems[s.k], metal = TOP_METAL[s.k], big = s.k === 0, Y = floor - s.h, cx = s.X + s.w/2;
     // price
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = big ? 54 : 42; const pv = topMoney(x.best);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = big ? 54 : 42; const pv = topMoney(pieceVal(x));
     ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > s.w && pf > 24){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
     ctx.fillStyle = INK; ctx.shadowColor = hexA(metal.glow, big ? .55 : .3); ctx.shadowBlur = big ? 26 : 14; ctx.fillText(pv, cx, Y - 18 - cb); ctx.shadowBlur = 0;
-    topCard(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
+    topPiece(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
     topChip(ctx, x, cx, Y - 46, true);
     topMedal(ctx, cx, floor, big ? 30 : 25, s.k, metal);
     // label
@@ -3694,20 +3758,20 @@ function drawTopList(){
   for(let j=0; j<rest; j++){
     const k = j + pod, x = topItems[k], c = j % cols, r = Math.floor(j / cols), inRow = r === rows - 1 ? rest - r*cols : cols;
     const X = (W - (inRow*tw + (inRow-1)*gap))/2 + c*(tw + gap), Y = G0 + r*rh, cx = X + tw/2;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = 30; const pv = topMoney(x.best); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 4 && pf > 18){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = 30; const pv = topMoney(pieceVal(x)); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 4 && pf > 18){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
     ctx.fillStyle = INK; ctx.fillText(pv, cx, Y + 26);
     topChip(ctx, x, cx, Y + 36, false);
-    const cy = Y + 36 + cs; topCard(ctx, x, X, cy, tw, th, null, .55);
+    const cy = Y + 36 + cs; topPiece(ctx, x, X, cy, tw, th, null, .55);
     // rank tab hanging off the bottom-right
     ctx.font = '400 20px Anton'; const rt = '#'+(k+1), rw = ctx.measureText(rt).width + 16;
     rrect(ctx, X + tw - rw - 6, cy + th - 16, rw, 28, 7); ctx.fillStyle = '#0B0B0C'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.stroke();
     ctx.fillStyle = INK; ctx.fillText(rt, X + tw - rw/2 - 6, cy + th + 5);
     ctx.font = '700 15px Archivo'; ctx.fillStyle = INK; ctx.fillText(fitText(ctx, topName(x), tw + 8), cx, cy + th + 34);
-    ctx.font = '600 11px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(fitText(ctx, topSub(x).toUpperCase(), tw + 8), cx, cy + th + 52);
+    ctx.font = '600 11px "JetBrains Mono"'; ctx.fillStyle = faint; ctx.fillText(fitText(ctx, topSub(x, true).toUpperCase(), tw + 8), cx, cy + th + 52);
   }
   // footer
   ctx.textAlign = 'left'; ctx.font = '700 14px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
-  const foot = top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
+  const foot = top.kind === 'graded' ? 'GRADED SOLD PRICES  ·  '+(topMeta && topMeta.source ? topMeta.source.toUpperCase()+'  ·  ' : '')+'RAW = TCGPLAYER NM  ·  '+cur : top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
   ctx.fillText(foot, gx, H - 28); ctx.textAlign = 'right'; ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, H - 28); ctx.textAlign = 'left'; spaced(ctx, 0);
   grainVignette(ctx, rnd, .022, .45);
   return cv;
