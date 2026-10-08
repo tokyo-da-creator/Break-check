@@ -3323,7 +3323,7 @@ function topCard(ctx, x, X, Y, w, h, metal, foilS){
 }
 function topChip(ctx, x, cx, Y, big){
   let t, col;
-  if(top.kind === 'graded'){ if(!x.best) return; const m = x.sale/x.best; t = (m >= 10 ? Math.round(m) : m.toFixed(1))+'× RAW'; col = '#C6FF3D'; }
+  if(top.kind === 'graded'){ if(!x.best) return; const m = x.sale/x.best; t = 'RAW '+topMoney(x.best)+'  ·  '+(m >= 10 ? Math.round(m) : m.toFixed(1))+'×'; col = '#C6FF3D'; }
   else if(top.kind === 'sold'){ t = (x.sold || 0).toLocaleString('en-US')+' SOLD'; col = '#F4F1EA'; }
   else if(x.change != null){ t = topPct(x.change)+(top.kind === 'set' ? ' 30D' : ''); col = x.change >= 0 ? '#3BE38A' : '#FF5A4E'; }
   else return;
@@ -3346,9 +3346,24 @@ const GRADERS = {PSA: '#E8433F', BGS: '#C9CED6', 'BGS BL': '#F5C84C', CGC: '#3D8
 const GRADE_WORD = {10: 'GEM MINT', 9.5: 'GEM MINT', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7: 'NM'};
 const graderKey = x => x.grader === 'BGS' && /black/i.test(x.label || '') ? 'BGS BL' : x.grader;
 const slabDims = w => { const m = Math.round(w*0.055), lh = Math.round(w*(w > 220 ? 0.27 : 0.25)), pad = Math.round(w*0.04), cw = w - 2*m - 2*pad, ch = Math.round(cw*1.395); return {m, lh, pad, cw, ch, h: m + lh + m + ch + pad*2 + m}; };
-const pieceH = w => top.kind === 'graded' ? slabDims(w).h : Math.round(w*1.395);
+const pieceH = w => Math.round(w*1.395);
 const pieceVal = x => top.kind === 'graded' ? x.sale : x.best;
-function topPiece(ctx, x, X, Y, w, h, metal, foilS){ return top.kind === 'graded' ? topSlab(ctx, x, X, Y, w, h, metal) : topCard(ctx, x, X, Y, w, h, metal, foilS); }
+function topPiece(ctx, x, X, Y, w, h, metal, foilS){ const r = topCard(ctx, x, X, Y, w, h, metal, foilS); if(top.kind === 'graded') gradeTag(ctx, x, X + w/2, Y, w > 220); return r; }
+// A grade tag clipped to the top of the card: grader colour, grade, nothing pretending to be a slab
+function gradeTag(ctx, x, cx, y, big){
+  const acc = GRADERS[graderKey(x)] || '#F4F1EA', t = x.grader+' '+x.grade, sub = big ? (/black/i.test(x.label || '') ? 'BLACK LABEL' : /pristine/i.test(x.label || '') ? 'PRISTINE' : (GRADE_WORD[x.grade] || '')) : '';
+  ctx.save(); ctx.textBaseline = 'middle';
+  ctx.font = '400 '+(big ? 26 : 17)+'px Anton'; spaced(ctx, big ? 2 : 1); const tw = ctx.measureText(t).width;
+  ctx.font = '700 '+(big ? 11 : 9)+'px "JetBrains Mono"'; spaced(ctx, 2); const sw = sub ? ctx.measureText(sub).width + 14 : 0;
+  const dot = big ? 9 : 6, padX = big ? 16 : 10, h = big ? 42 : 28, w = padX + dot*2 + (big ? 10 : 7) + tw + sw + padX, X = cx - w/2, Y = y - h/2;
+  ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4; rrect(ctx, X, Y, w, h, h/2); ctx.fillStyle = '#0B0B0E'; ctx.fill(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(acc, .85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(X + padX + dot, y, dot*0.62, 0, Math.PI*2); ctx.fillStyle = acc; ctx.shadowColor = hexA(acc, .9); ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  let tx = X + padX + dot*2 + (big ? 10 : 7); ctx.textAlign = 'left';
+  ctx.font = '400 '+(big ? 26 : 17)+'px Anton'; spaced(ctx, big ? 2 : 1); ctx.fillStyle = '#F4F1EA'; ctx.fillText(t, tx, y + 1);
+  if(sub){ tx += tw + 14; ctx.fillStyle = hexA(acc, .5); ctx.fillRect(tx - 8, y - 9, 1.5, 18); ctx.font = '700 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = 'rgba(244,241,234,.7)'; ctx.fillText(sub, tx, y + 1); }
+  ctx.restore();
+}
 function topSlab(ctx, x, X, Y, w, h, metal){
   const d = slabDims(w), rad = Math.round(w*0.05), acc = GRADERS[graderKey(x)] || '#F4F1EA', big = w > 220;
   // lift + podium glow, same as the raw cards
@@ -3404,11 +3419,11 @@ function drawTopList(){
   const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : [LIME];
   // podium geometry
   const pod = Math.min(3, n), w1 = 330, h1 = pieceH(w1), w2 = 268, h2 = pieceH(w2), pgap = 46;
-  const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? 40 : 0;
+  const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? (top.kind === 'graded' ? 56 : 40) : 0;
   const Y0 = 262, top1 = Y0 + 58 + cb, floor = top1 + h1, podEnd = floor + 112;
   // the rest
   const rest = n - pod, cols = rest <= 7 ? Math.max(rest, 1) : 6, rows = Math.ceil(rest/cols), gap = 16;
-  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = pieceH(tw), cs = chips ? 32 : 0, rh = 34 + cs + th + 64;
+  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = pieceH(tw), cs = chips ? (top.kind === 'graded' ? 48 : 32) : 0, rh = 34 + cs + th + 64;
   const G0 = podEnd + (rest ? 56 : 0), H = Math.round(G0 + rows*rh + 70);
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   // background: solid near-black, one spotlight in the lead card's colour, a floor pool under the podium
@@ -3442,7 +3457,7 @@ function drawTopList(){
     ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > s.w && pf > 24){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
     ctx.fillStyle = INK; ctx.shadowColor = hexA(metal.glow, big ? .55 : .3); ctx.shadowBlur = big ? 26 : 14; ctx.fillText(pv, cx, Y - 18 - cb); ctx.shadowBlur = 0;
     topPiece(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
-    topChip(ctx, x, cx, Y - 46, true);
+    topChip(ctx, x, cx, Y - 46 - (top.kind === 'graded' ? 16 : 0), true);
     topMedal(ctx, cx, floor, big ? 30 : 25, s.k, metal);
     // label
     ctx.textAlign = 'center'; ctx.font = '800 '+(big ? 24 : 20)+'px Archivo'; ctx.fillStyle = INK; ctx.fillText(fitText(ctx, topName(x), s.w + 30), cx, floor + (big ? 66 : 62));
