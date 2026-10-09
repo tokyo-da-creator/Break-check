@@ -289,6 +289,11 @@ footer .f-bottom a:hover{text-decoration:underline}
 .results li[role=option]{animation:rise .22s ease-out both}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
 /* ---------- PSA sales ---------- */
+#panel-psa input::placeholder{color:#5A5A60;font-style:italic}
+#psaDate{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left}
+#psaDate::-webkit-date-and-time-value{text-align:left}
+.need{color:var(--fg)}
+.need b{color:var(--win)}
 .certrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 .certrow .btn{flex:none;min-height:52px}
 .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
@@ -928,11 +933,11 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
     </div>
     <div class="step">
       <div class="stephead"><span class="num">2</span>The card</div>
-      <div class="field"><label for="psaName">Card</label><input id="psaName" type="text" maxlength="90" placeholder="Monkey D. Luffy" class="txt"></div>
-      <div class="field"><label for="psaSet">Year and set</label><input id="psaSet" type="text" maxlength="90" placeholder="2026 One Piece JP" class="txt"></div>
-      <div class="field"><label for="psaVariety">Variety or edition (optional)</label><input id="psaVariety" type="text" maxlength="90" placeholder="PCC Nike Collab Edition" class="txt"></div>
+      <div class="field"><label for="psaName">Card</label><input id="psaName" type="text" maxlength="90" placeholder="e.g. Monkey D. Luffy" class="txt"></div>
+      <div class="field"><label for="psaSet">Year and set</label><input id="psaSet" type="text" maxlength="90" placeholder="e.g. 2026 One Piece JP" class="txt"></div>
+      <div class="field"><label for="psaVariety">Variety or edition (optional)</label><input id="psaVariety" type="text" maxlength="90" placeholder="e.g. PCC Nike Collab Edition" class="txt"></div>
       <div class="pair">
-        <div class="field"><label for="psaNum">Card number</label><input id="psaNum" type="text" maxlength="20" placeholder="099" class="txt"></div>
+        <div class="field"><label for="psaNum">Card number</label><input id="psaNum" type="text" maxlength="20" placeholder="e.g. 099" class="txt"></div>
         <div class="field"><label for="psaGrade">Grade</label><select id="psaGrade" class="sel"></select></div>
       </div>
       <div class="field"><label for="psaPop">PSA population at this grade (optional)</label><input id="psaPop" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 37"></div>
@@ -4431,7 +4436,12 @@ function updatePsa(){
   $('psaMoney').dataset.cur = cur;
   const ok = psaReady();
   $('psaEmpty').hidden = !!ok; $('psaOut').hidden = !ok; if(!ok) $('psaPreview').hidden = true;
-  if(!ok) return null;
+  if(!ok){
+    const miss = [!psa.name.trim() && 'the <b>card name</b>', !(num(psa.price) > 0) && 'what it <b>sold for</b>'].filter(Boolean);
+    const started = psa.name.trim() || num(psa.price) > 0 || psa.cert;
+    $('psaEmpty').innerHTML = started ? '<span class="need">Almost there. Add '+miss.join(' and ')+' above and your sale card shows up here.</span>' : 'Enter a cert number or the card details, then what it sold for. Your sale card shows up here.';
+    return null;
+  }
   clearTimeout(tPsa); tPsa = setTimeout(()=>{ const cv = drawPsaSale(false); if(cv){ $('psaImg').src = cv.toDataURL('image/jpeg', 0.9); $('psaPreview').hidden = false; } else { $('psaPreview').hidden = true; setTimeout(updatePsa, 300); } }, 120);
   return true;
 }
