@@ -251,6 +251,23 @@ window.__noShare = true;
     var seen={}; list = list.filter(function(x){ var k=c.items[x.i][0]; if(seen[k]) return false; seen[k]=1; return true; }).slice(0, n);
     return {results: list.map(function(x){ var o=res(c,x.i); o.then=x.then; o.histNow=x.now; o.sold=x.sold; o.change=x.ch; o.setDate=c.sets[c.items[x.i][7]][1]; return o; }), rows: list.map(function(x){ return x.i; }), moversAt: m.builtAt};
   }
+  // Worth grading: PSA 10 values (CardOS, weekly) joined to today's raw TCGplayer price
+  var grdP=null;
+  function grades(){ return grdP || (grdP = realFetch('grades.json').then(function(r){ if(!r.ok) throw 0; return r.json(); })); }
+  function worthList(c, g){
+    var byId={}; c.items.forEach(function(e,i){ if(e[8]==='c') (byId[e[0]]=byId[e[0]]||[]).push(i); });
+    var out=[], seen={};
+    (g.rows||[]).forEach(function(r){
+      var ids=byId[r[0]]; if(!ids || seen[r[0]+'|'+r[1]]) return;
+      var i=ids.filter(function(k){ return !r[1] || c.items[k][4]===r[1]; })[0]; if(i==null) i=ids[0];
+      var e=c.items[i], raw=best(e[5],e[6]);
+      if(c.sets[e[7]][2]!==0 || raw==null || raw<50) return;          // English cards worth grading at all
+      if(r[3]<2 || r[2]<raw*0.5) return;                                // enough PSA 10 sales, and no obvious mismatch
+      seen[r[0]+'|'+r[1]]=1;
+      var o=res(c,i); o.g10=r[2]; o.g10sold=r[3]; out.push(o);
+    });
+    return {results: out, gradesAt: g.builtAt, source: 'CardOS'};
+  }
   function json(body, status){ return new Response(JSON.stringify(body), {status: status||200, headers:{'Content-Type':'application/json'}}); }
   window.fetch=function(input, init){
     var url = typeof input==='string' ? input : input.url;
@@ -286,8 +303,10 @@ window.__noShare = true;
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }
-    if(url.indexOf('/api/graded')===0) return realFetch(input, init);
-    if(url.indexOf('/api/worth')===0) return realFetch(input, init);
+    if(url.indexOf('/api/worth')===0){
+      return Promise.all([cat(), grades()]).then(function(a){ var b=worthList(a[0], a[1]); b.builtAt=a[0].builtAt; return json(b); },
+        function(){ return json({error:'Grading values are being prepared. Check back soon.', results:[]}, 503); });
+    }
     if(url.indexOf('/api/fx')===0) return Promise.resolve(json({AUD: FX_AUD}));
     if(url.indexOf('/api/')===0) return Promise.resolve(json({error:'Not available here.'}, 503));
     return realFetch(input, init);

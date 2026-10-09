@@ -1005,6 +1005,23 @@ header.top .tabs{margin-top:18px}
     var seen={}; list = list.filter(function(x){ var k=c.items[x.i][0]; if(seen[k]) return false; seen[k]=1; return true; }).slice(0, n);
     return {results: list.map(function(x){ var o=res(c,x.i); o.then=x.then; o.histNow=x.now; o.sold=x.sold; o.change=x.ch; o.setDate=c.sets[c.items[x.i][7]][1]; return o; }), rows: list.map(function(x){ return x.i; }), moversAt: m.builtAt};
   }
+  // Worth grading: PSA 10 values (CardOS, weekly) joined to today's raw TCGplayer price
+  var grdP=null;
+  function grades(){ return grdP || (grdP = realFetch('grades.json').then(function(r){ if(!r.ok) throw 0; return r.json(); })); }
+  function worthList(c, g){
+    var byId={}; c.items.forEach(function(e,i){ if(e[8]==='c') (byId[e[0]]=byId[e[0]]||[]).push(i); });
+    var out=[], seen={};
+    (g.rows||[]).forEach(function(r){
+      var ids=byId[r[0]]; if(!ids || seen[r[0]+'|'+r[1]]) return;
+      var i=ids.filter(function(k){ return !r[1] || c.items[k][4]===r[1]; })[0]; if(i==null) i=ids[0];
+      var e=c.items[i], raw=best(e[5],e[6]);
+      if(c.sets[e[7]][2]!==0 || raw==null || raw<50) return;          // English cards worth grading at all
+      if(r[3]<2 || r[2]<raw*0.5) return;                                // enough PSA 10 sales, and no obvious mismatch
+      seen[r[0]+'|'+r[1]]=1;
+      var o=res(c,i); o.g10=r[2]; o.g10sold=r[3]; out.push(o);
+    });
+    return {results: out, gradesAt: g.builtAt, source: 'CardOS'};
+  }
   function json(body, status){ return new Response(JSON.stringify(body), {status: status||200, headers:{'Content-Type':'application/json'}}); }
   window.fetch=function(input, init){
     var url = typeof input==='string' ? input : input.url;
@@ -1040,15 +1057,17 @@ header.top .tabs{margin-top:18px}
         },
                         function(){ return json({error:'Prices couldn’t load. Refresh the page.', results:[]}, 503); });
     }
-    if(url.indexOf('/api/graded')===0) return realFetch(input, init);
-    if(url.indexOf('/api/worth')===0) return realFetch(input, init);
+    if(url.indexOf('/api/worth')===0){
+      return Promise.all([cat(), grades()]).then(function(a){ var b=worthList(a[0], a[1]); b.builtAt=a[0].builtAt; return json(b); },
+        function(){ return json({error:'Grading values are being prepared. Check back soon.', results:[]}, 503); });
+    }
     return realFetch(input, init);
   };
   cat();
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791488647';
+(function(){ var BUILD='1791506534';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3447,11 +3466,13 @@ updateShow();
 // ---------- top lists: most valuable in a set, biggest gainers / drops, most sold ----------
 let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: ''}, store.get('top1') || {});
 let topItems = [], topMeta = null, tTop;
-const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold', graded: 'Highest graded sales', gradeyes: 'Worth grading', gradeno: 'Don’t bother grading'};
+const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold', gradeyes: 'Worth grading', gradeno: 'Don’t bother grading'};
 // ---------- worth grading? PSA 10 value minus raw minus grading + shipping ----------
 const isWorth = () => top.kind === 'gradeyes' || top.kind === 'gradeno';
-// Rough PSA fee + insured return shipping by declared value (estimate; tiers change)
-const gradeFee = v => v <= 500 ? 45 : v <= 1500 ? 95 : v <= 2500 ? 175 : v <= 5000 ? 325 : 625;
+// PSA's per-card fee for the tier a PSA 10 would be declared in (psacard.com, Oct 2026; Value tiers unavailable),
+// plus ~$25 for shipping there and insured return.
+const PSA_TIERS = [[1000, 59.99], [1500, 79.99], [2500, 199], [5000, 349], [10000, 599], [25000, 999], [50000, 1999], [100000, 2999], [250000, 4999]];
+const gradeFee = v => ((PSA_TIERS.find(t=>v <= t[0]) || [0, 9999])[1]) + 25;
 const signMoney = v => (v >= 0 ? '+' : '−')+money(fromUsd(Math.abs(v)), 0);
 
 function saveTop(){ store.set('top1', top); }
@@ -3493,14 +3514,12 @@ async function openTop(){
   $('topEmpty').hidden = false; $('topEmpty').textContent = 'Getting today’s prices…'; $('topOut').hidden = true; $('topPreview').hidden = true;
   const want = top.n, url = top.kind === 'set' ? '/api/search?settop='+top.set.i+'&n='+want
     : isWorth() ? '/api/worth?side='+(top.kind === 'gradeyes' ? 'yes' : 'no')+'&n='+want+(top.lang ? '&lang='+top.lang : '')
-    : top.kind === 'graded' ? '/api/graded?period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '')
     : '/api/search?movers='+top.kind+'&period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '');
   try{
     const r = await fetch(url), d = await r.json();
     if(!r.ok) throw new Error(d.error || 'bad');
-    let items = (d.results||[]).filter(x=>top.kind === 'graded' ? x.sale != null : isWorth() ? x.best != null && x.g10 != null : x.best != null);
+    let items = (d.results||[]).filter(x=>x.best != null && (!isWorth() || x.g10 != null));
     if(isWorth()){ items.forEach(x=>{ x.fee = gradeFee(x.g10); x.profit = x.g10 - x.best - x.fee; }); items.sort((a,b)=>top.kind === 'gradeyes' ? b.profit - a.profit : a.profit - b.profit); }
-    else if(top.kind === 'graded') items.sort((a,b)=>b.sale - a.sale);
     else if(top.kind === 'set'){
       items.sort((a,b)=>b.best - a.best);
       // 30-day move, only where enough copies sold for the move to be real
@@ -3511,7 +3530,7 @@ async function openTop(){
       if(top.kind === 'gain') items = items.filter(x=>x.change > 0).sort((a,b)=>b.change - a.change);
       if(top.kind === 'drop') items = items.filter(x=>x.change < 0).sort((a,b)=>a.change - b.change);
     }
-    topItems = items.slice(0, want); topMeta = {at: d.moversAt || d.builtAt, pack: d.pack || null, source: d.source || ''};
+    topItems = items.slice(0, want); topMeta = {at: d.gradesAt || d.moversAt || d.builtAt, pack: d.pack || null, source: d.source || ''};
     renderTop();
   }catch(e){ topItems = []; $('topEmpty').textContent = e.message && e.message !== 'bad' ? e.message : 'Couldn’t load this list. Try again in a moment.'; $('topOut').hidden = true; $('topPreview').hidden = true; }
 }
@@ -3535,12 +3554,13 @@ function renderTop(){
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name + (x.number ? ' '+x.number : '');
     const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : ''].filter(Boolean).join(' · ');
     mid.append(nm, sb);
-    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(top.kind === 'graded' ? x.sale : x.best));
+    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = isWorth() ? signMoney(x.profit) : money(fromUsd(x.best));
     if(top.kind !== 'set' || x.change != null){ const ch = document.createElement('span'); ch.className = 'ch';
-      ch.textContent = top.kind === 'graded' ? x.grader+' '+x.grade : top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' || top.kind === 'graded' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
+      ch.textContent = isWorth() ? 'raw '+topMoney(x.best)+' → PSA 10 '+topMoney(x.g10) : top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' || isWorth() ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
     li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
   });
-  $('topNote').textContent = top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
+  $('topNote').textContent = isWorth() ? 'PSA 10 value (CardOS, from recent sales) minus today’s raw TCGplayer near-mint price, minus PSA’s grading fee for that value tier and about $25 shipping. Assumes it comes back a 10.'+(topMeta && topMeta.at ? ' PSA 10 values updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'})+'.' : '')
+    : top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
     : 'Change from TCGplayer’s near-mint market price '+(top.period === 'month' ? '30' : '7')+' days ago to today. Cards worth $20+ with at least '+(top.period === 'month' ? 12 : 6)+' sales in that time'+(topMeta && topMeta.at ? '. History updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}) : '')+'.';
   topItems.forEach(x=>productArt(x.id, false));
   drawTopSoon();
@@ -3560,7 +3580,6 @@ function topSub(x, short){
   const v = x.variant === 'Reverse' ? 'Reverse Holo' : x.variant && !/^normal$/i.test(x.variant) ? x.variant : '';
   const num = x.number ? '#'+String(x.number).split('/')[0].replace(/^0+(?=\d)/, '') : '';
   if(isWorth()) return [shortSet(x.set).replace(/^Miscellaneous Cards.*/i, 'Promo'), x.number ? '#'+String(x.number).split('/')[0].replace(/^0+(?=\d)/, '') : ''].filter(Boolean).join(' · ');
-  if(top.kind === 'graded') return [x.grader+' '+x.grade, soldWhen(x), short ? '' : x.venue].filter(Boolean).join(' · ');
   return (top.kind === 'set' ? [num, v, x.jp ? 'JP' : ''] : [shortSet(x.set).replace(/^Miscellaneous Cards.*/i, 'Promo'), num, v, x.jp ? 'JP' : '']).filter(Boolean).join(' · ');
 }
 function fitText(ctx, s, max){
@@ -3580,7 +3599,6 @@ function topQuip(){
   }
   if(top.kind === 'gradeyes') return [topName(a)+': '+signMoney(a.profit)+' if it gems', 'Send it to PSA. Then pray.'];
   if(top.kind === 'gradeno') return [topName(a)+': '+signMoney(a.profit)+' after fees', 'Keep it raw. Rip a pack instead.'];
-  if(top.kind === 'graded'){ const m = a.best ? a.sale/a.best : 0; return [topName(a)+' '+a.grader+' '+a.grade+': '+topMoney(a.sale), m >= 1.5 ? 'That’s '+(m >= 10 ? Math.round(m) : m.toFixed(1))+'× the raw price. Grade your hits.' : 'Slab tax: barely. Keep it raw.']; }
   if(top.kind === 'gain') return [topName(a)+' '+topPct(a.change)+' '+per, 'Somebody knew. Was it you?'];
   if(top.kind === 'drop') return [topName(a)+' '+topPct(a.change)+' '+per, 'Buy the dip or catch a knife?'];
   const sold = topItems.reduce((s, x)=>s + (x.sold || 0), 0);
@@ -3639,7 +3657,6 @@ function topCard(ctx, x, X, Y, w, h, metal, foilS){
 function topChip(ctx, x, cx, Y, big){
   let t, col;
   if(isWorth()){ t = big ? 'RAW '+topMoney(x.best)+'  →  PSA 10 '+topMoney(x.g10) : topMoney(x.best)+' → '+topMoney(x.g10); col = '#D9D4C8'; }
-  else if(top.kind === 'graded'){ if(!x.best) return; const m = x.sale/x.best; t = 'RAW '+topMoney(x.best)+'  ·  '+(m >= 10 ? Math.round(m) : m.toFixed(1))+'×'; col = '#C6FF3D'; }
   else if(top.kind === 'sold'){ t = (x.sold || 0).toLocaleString('en-US')+' SOLD'; col = '#F4F1EA'; }
   else if(x.change != null){ t = topPct(x.change)+(top.kind === 'set' ? ' 30D' : ''); col = x.change >= 0 ? '#3BE38A' : '#FF5A4E'; }
   else return;
@@ -3657,91 +3674,21 @@ function topMedal(ctx, cx, cy, r, k, metal){
   ctx.font = '400 '+Math.round(r*1.15)+'px Anton'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#141414'; ctx.fillText(String(k+1), cx, cy + r*0.06);
   ctx.restore();
 }
-// ---------- graded: each card in a slab ----------
-const GRADERS = {PSA: '#E8433F', BGS: '#C9CED6', 'BGS BL': '#F5C84C', CGC: '#3D8BFF', SGC: '#2FD39A', TAG: '#C6FF3D'};
-const GRADE_WORD = {10: 'GEM MINT', 9.5: 'GEM MINT', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7: 'NM'};
-const graderKey = x => x.grader === 'BGS' && /black/i.test(x.label || '') ? 'BGS BL' : x.grader;
-const slabDims = w => { const m = Math.round(w*0.055), lh = Math.round(w*(w > 220 ? 0.27 : 0.25)), pad = Math.round(w*0.04), cw = w - 2*m - 2*pad, ch = Math.round(cw*1.395); return {m, lh, pad, cw, ch, h: m + lh + m + ch + pad*2 + m}; };
 const pieceH = w => Math.round(w*1.395);
-const pieceVal = x => top.kind === 'graded' ? x.sale : x.best;
+const pieceVal = x => x.best;
 const pieceTxt = x => isWorth() ? signMoney(x.profit) : topMoney(pieceVal(x));
 const pieceCol = x => isWorth() ? (x.profit < 0 ? '#FF5A4E' : x.profit < 75 ? '#FFB020' : '#C6FF3D') : '#F4F1EA';
-function topPiece(ctx, x, X, Y, w, h, metal, foilS){ const r = topCard(ctx, x, X, Y, w, h, metal, foilS); if(top.kind === 'graded') gradeTag(ctx, x, X + w/2, Y, w > 220); return r; }
-// A grade tag clipped to the top of the card: grader colour, grade, nothing pretending to be a slab
-function gradeTag(ctx, x, cx, y, big){
-  const acc = GRADERS[graderKey(x)] || '#F4F1EA', t = x.grader+' '+x.grade, sub = big ? (/black/i.test(x.label || '') ? 'BLACK LABEL' : /pristine/i.test(x.label || '') ? 'PRISTINE' : (GRADE_WORD[x.grade] || '')) : '';
-  ctx.save(); ctx.textBaseline = 'middle';
-  ctx.font = '400 '+(big ? 26 : 17)+'px Anton'; spaced(ctx, big ? 2 : 1); const tw = ctx.measureText(t).width;
-  ctx.font = '700 '+(big ? 11 : 9)+'px "JetBrains Mono"'; spaced(ctx, 2); const sw = sub ? ctx.measureText(sub).width + 14 : 0;
-  const dot = big ? 9 : 6, padX = big ? 16 : 10, h = big ? 42 : 28, w = padX + dot*2 + (big ? 10 : 7) + tw + sw + padX, X = cx - w/2, Y = y - h/2;
-  ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4; rrect(ctx, X, Y, w, h, h/2); ctx.fillStyle = '#0B0B0E'; ctx.fill(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(acc, .85); ctx.stroke();
-  ctx.beginPath(); ctx.arc(X + padX + dot, y, dot*0.62, 0, Math.PI*2); ctx.fillStyle = acc; ctx.shadowColor = hexA(acc, .9); ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
-  let tx = X + padX + dot*2 + (big ? 10 : 7); ctx.textAlign = 'left';
-  ctx.font = '400 '+(big ? 26 : 17)+'px Anton'; spaced(ctx, big ? 2 : 1); ctx.fillStyle = '#F4F1EA'; ctx.fillText(t, tx, y + 1);
-  if(sub){ tx += tw + 14; ctx.fillStyle = hexA(acc, .5); ctx.fillRect(tx - 8, y - 9, 1.5, 18); ctx.font = '700 11px "JetBrains Mono"'; spaced(ctx, 2); ctx.fillStyle = 'rgba(244,241,234,.7)'; ctx.fillText(sub, tx, y + 1); }
-  ctx.restore();
-}
-function topSlab(ctx, x, X, Y, w, h, metal){
-  const d = slabDims(w), rad = Math.round(w*0.05), acc = GRADERS[graderKey(x)] || '#F4F1EA', big = w > 220;
-  // lift + podium glow, same as the raw cards
-  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#0d0d10';
-  ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 44; ctx.shadowOffsetY = 28; ctx.fill(); ctx.shadowBlur = 6; ctx.shadowOffsetY = 3; ctx.fill(); ctx.restore();
-  if(metal){ [[90, .2], [40, .4], [14, .7]].forEach(([b, al])=>{ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.shadowColor = hexA(metal.glow, al); ctx.shadowBlur = b; ctx.fillStyle = '#0d0d10'; ctx.fill(); ctx.restore(); }); }
-  // acrylic body: smoky clear plastic
-  const body = ctx.createLinearGradient(X, Y, X + w, Y + h); body.addColorStop(0, 'rgba(255,255,255,.16)'); body.addColorStop(.5, 'rgba(255,255,255,.07)'); body.addColorStop(1, 'rgba(255,255,255,.12)');
-  rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#121216'; ctx.fill(); ctx.fillStyle = body; ctx.fill();
-  // label
-  const lx = X + d.m, ly = Y + d.m, lw = w - 2*d.m, lr = Math.round(rad*0.55);
-  ctx.save(); rrect(ctx, lx, ly, lw, d.lh, lr); ctx.clip();
-  const lg = ctx.createLinearGradient(0, ly, 0, ly + d.lh); lg.addColorStop(0, '#1B1B20'); lg.addColorStop(1, '#0E0E11'); ctx.fillStyle = lg; ctx.fillRect(lx, ly, lw, d.lh);
-  ctx.fillStyle = acc; ctx.fillRect(lx, ly, Math.max(5, w*0.02), d.lh);                          // grader colour strip
-  ctx.globalAlpha = .06; ctx.fillStyle = '#fff'; for(let i = 0; i < lw; i += 6) ctx.fillRect(lx + i, ly, 1, d.lh); ctx.globalAlpha = 1;   // fine security lines
-  ctx.restore();
-  rrect(ctx, lx, ly, lw, d.lh, lr); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(acc, .55); ctx.stroke();
-  // grade block on the right
-  const gs = String(x.grade), gw = d.lh*(gs.length > 2 ? 1.2 : 1.0), gx0 = lx + lw - gw;
-  ctx.save(); rrect(ctx, gx0, ly, gw, d.lh, lr); ctx.clip(); const gg = ctx.createLinearGradient(gx0, ly, gx0, ly + d.lh); gg.addColorStop(0, hexA(acc, .28)); gg.addColorStop(1, hexA(acc, .08)); ctx.fillStyle = gg; ctx.fillRect(gx0, ly, gw, d.lh); ctx.restore();
-  ctx.fillStyle = hexA(acc, .5); ctx.fillRect(gx0, ly + d.lh*0.14, 1.5, d.lh*0.72);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.font = '400 '+Math.round(d.lh*(big ? 0.58 : 0.62))+'px Anton'; ctx.fillStyle = acc; ctx.shadowColor = hexA(acc, .6); ctx.shadowBlur = 14; ctx.fillText(gs, gx0 + gw/2, ly + d.lh*(big ? 0.64 : 0.74)); ctx.shadowBlur = 0;
-  if(big) ctx.font = '700 '+Math.max(8, Math.round(d.lh*0.12))+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.75)'; if(big) ctx.fillText(/black/i.test(x.label || '') ? 'BLACK LBL' : /pristine/i.test(x.label || '') ? 'PRISTINE' : (GRADE_WORD[x.grade] || ''), gx0 + gw/2, ly + d.lh*0.86); spaced(ctx, 0);
-  // grader + card text on the left
-  const tx = lx + Math.max(5, w*0.02) + d.lh*0.16, tmax = gx0 - tx - 8; ctx.textAlign = 'left';
-  ctx.font = '400 '+Math.round(d.lh*(big ? 0.26 : 0.34))+'px Anton'; spaced(ctx, 2); ctx.fillStyle = '#F4F1EA'; ctx.fillText(x.grader, tx, ly + d.lh*(big ? 0.34 : 0.44)); spaced(ctx, 0);
-  if(big){
-    ctx.font = '700 '+Math.round(d.lh*0.17)+'px Archivo'; ctx.fillStyle = 'rgba(244,241,234,.9)'; ctx.fillText(fitText(ctx, topName(x), tmax), tx, ly + d.lh*0.6);
-    ctx.font = '600 '+Math.round(d.lh*0.115)+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.5)'; ctx.fillText(fitText(ctx, (shortSet(x.set)+(x.number ? ' #'+String(x.number).split('/')[0] : '')).toUpperCase(), tmax), tx, ly + d.lh*0.8); spaced(ctx, 0);
-  } else {
-    ctx.font = '600 '+Math.max(8, Math.round(d.lh*0.15))+'px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = 'rgba(244,241,234,.5)'; ctx.fillText(fitText(ctx, x.number ? '#'+String(x.number).split('/')[0] : '', tmax), tx, ly + d.lh*0.74); spaced(ctx, 0);
-  }
-  // card window: a recessed bed with the card floating in it
-  const wx = X + d.m, wy = ly + d.lh + d.m, ww = w - 2*d.m, wh = d.ch + d.pad*2;
-  rrect(ctx, wx, wy, ww, wh, lr); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.stroke();
-  const cx0 = wx + d.pad, cy0 = wy + d.pad, crad = Math.round(d.cw*0.045), a = productArt(x.id, false);
-  ctx.save(); rrect(ctx, cx0, cy0, d.cw, d.ch, crad); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4; ctx.fillStyle = '#111'; ctx.fill(); ctx.restore();
-  if(a){ ctx.save(); rrect(ctx, cx0, cy0, d.cw, d.ch, crad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(d.cw/iw, d.ch/ih); ctx.drawImage(im, cx0 + (d.cw - iw*k)/2, cy0 + (d.ch - ih*k)/2, iw*k, ih*k); ctx.restore(); }
-  topFoil(ctx, cx0, cy0, d.cw, d.ch, crad, big ? .7 : .45);
-  // plastic over everything: one long glare streak, edge bevel, rim
-  ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); ctx.globalCompositeOperation = 'screen';
-  const gl = ctx.createLinearGradient(X, Y, X + w, Y + h*0.7); gl.addColorStop(.18, 'rgba(255,255,255,0)'); gl.addColorStop(.26, 'rgba(255,255,255,.16)'); gl.addColorStop(.31, 'rgba(255,255,255,.05)'); gl.addColorStop(.36, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.fillRect(X, Y, w, h); ctx.restore();
-  rrect(ctx, X + 3, Y + 3, w - 6, h - 6, rad - 2); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.stroke();
-  if(metal){ const g = ctx.createLinearGradient(X, Y, X + w, Y + h); metal.stops.forEach((c, i)=>g.addColorStop(i/(metal.stops.length-1), c)); rrect(ctx, X - 1, Y - 1, w + 2, h + 2, rad + 1); ctx.lineWidth = 4; ctx.strokeStyle = g; ctx.stroke(); }
-  else { rrect(ctx, X, Y, w, h, rad); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.38)'; ctx.stroke(); }
-}
-const soldWhen = x => x.soldAt ? 'SOLD '+new Date(x.soldAt+'T12:00:00').toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}).toUpperCase() : 'SOLD';
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
   const n = topItems.length, W = 1200, gx = 40, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(n*31 + 7);
   const lead = productArt(topItems[0].id, false), ACC = top.kind === 'gradeno' ? '#FF5A4E' : LIME, [cA] = isWorth() ? [ACC] : lead ? artPalette(lead.img, topItems[0].id) : [LIME];
   // podium geometry
   const pod = Math.min(3, n), w1 = 330, h1 = pieceH(w1), w2 = 268, h2 = pieceH(w2), pgap = 46;
-  const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? (top.kind === 'graded' ? 56 : 40) : 0;
+  const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? 40 : 0;
   const Y0 = 262, top1 = Y0 + 58 + cb, floor = top1 + h1, podEnd = floor + 112;
   // the rest
   const rest = n - pod, cols = rest <= 7 ? Math.max(rest, 1) : 6, rows = Math.ceil(rest/cols), gap = 16;
-  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = pieceH(tw), cs = chips ? (top.kind === 'graded' ? 48 : 32) : 0, rh = 34 + cs + th + 64;
+  const tw = Math.min(190, (W - gx*2 - gap*(cols-1))/cols), th = pieceH(tw), cs = chips ? 32 : 0, rh = 34 + cs + th + 64;
   const G0 = podEnd + (rest ? 56 : 0), H = Math.round(G0 + rows*rh + 70);
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   // background: solid near-black, one spotlight in the lead card's colour, a floor pool under the podium
@@ -3778,8 +3725,8 @@ function drawTopList(){
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = big ? 54 : 42; const pv = pieceTxt(x);
     ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > s.w && pf > 24){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
     ctx.fillStyle = pieceCol(x); ctx.shadowColor = hexA(isWorth() ? pieceCol(x) : metal.glow, big ? .55 : .3); ctx.shadowBlur = big ? 26 : 14; ctx.fillText(pv, cx, Y - 18 - cb); ctx.shadowBlur = 0;
-    topPiece(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
-    topChip(ctx, x, cx, Y - 46 - (top.kind === 'graded' ? 16 : 0), true);
+    topCard(ctx, x, s.X, Y, s.w, s.h, metal, big ? 1 : .8);
+    topChip(ctx, x, cx, Y - 46, true);
     topMedal(ctx, cx, floor, big ? 30 : 25, s.k, metal);
     // label
     ctx.textAlign = 'center'; ctx.font = '800 '+(big ? 24 : 20)+'px Archivo'; ctx.fillStyle = INK; ctx.fillText(fitText(ctx, topName(x), s.w + 30), cx, floor + (big ? 66 : 62));
@@ -3797,7 +3744,7 @@ function drawTopList(){
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let pf = 30; const pv = pieceTxt(x); ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; while(ctx.measureText(pv).width > tw - 4 && pf > 18){ pf -= 1; ctx.font = '700 '+pf+'px "Barlow Semi Condensed"'; }
     ctx.fillStyle = pieceCol(x); ctx.fillText(pv, cx, Y + 26);
     topChip(ctx, x, cx, Y + 36, false);
-    const cy = Y + 36 + cs; topPiece(ctx, x, X, cy, tw, th, null, .55);
+    const cy = Y + 36 + cs; topCard(ctx, x, X, cy, tw, th, null, .55);
     // rank tab hanging off the bottom-right
     ctx.font = '400 20px Anton'; const rt = '#'+(k+1), rw = ctx.measureText(rt).width + 16;
     rrect(ctx, X + tw - rw - 6, cy + th - 16, rw, 28, 7); ctx.fillStyle = '#0B0B0C'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.stroke();
@@ -3807,7 +3754,7 @@ function drawTopList(){
   }
   // footer
   ctx.textAlign = 'left'; ctx.font = '700 14px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
-  const foot = isWorth() ? 'PSA 10 VALUE − RAW (TCGPLAYER NM) − GRADING & SHIPPING EST.  ·  IF IT GEMS  ·  '+cur : top.kind === 'graded' ? 'GRADED SOLD PRICES  ·  '+(topMeta && topMeta.source ? topMeta.source.toUpperCase()+'  ·  ' : '')+'RAW = TCGPLAYER NM  ·  '+cur : top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
+  const foot = isWorth() ? 'PSA 10 (CARDOS) − RAW (TCGPLAYER NM) − PSA FEE & SHIPPING  ·  IF IT GEMS  ·  '+cur : top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
   ctx.fillText(foot, gx, H - 28); ctx.textAlign = 'right'; ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, H - 28); ctx.textAlign = 'left'; spaced(ctx, 0);
   grainVignette(ctx, rnd, .022, .45);
   return cv;
@@ -3815,9 +3762,10 @@ function drawTopList(){
 $('saveTop').addEventListener('click', async ()=>{ const cv = drawTopList(); if(cv) save(cv, 'top-'+top.kind+'-'+(top.set ? top.set.i : top.period)+'.jpg', $('statusTop'), 'image/jpeg'); });
 $('copyTop').addEventListener('click', ()=>{
   if(!topItems.length) return; const T = topTitle();
-  const head = top.kind === 'set' ? 'Top '+topItems.length+' most valuable cards in '+shortSet(top.set.name)+' (TCGplayer market, '+today.toLowerCase().replace(/\b\w/g, c=>c.toUpperCase())+'):'
+  const head = isWorth() ? (top.kind === 'gradeyes' ? 'Worth grading: PSA 10 profit after fees (if it gems):' : 'Don’t bother grading: a PSA 10 barely beats raw after fees:')
+    : top.kind === 'set' ? 'Top '+topItems.length+' most valuable cards in '+shortSet(top.set.name)+' (TCGplayer market, '+today.toLowerCase().replace(/\b\w/g, c=>c.toUpperCase())+'):'
     : KINDS[top.kind]+' '+(top.period === 'month' ? 'this month' : 'this week')+' (TCGplayer market):';
-  const lines = topItems.slice(0, 5).map((x,k)=>'#'+(k+1)+' '+x.name+' '+money(fromUsd(x.best), x.best >= 1000 ? 0 : 2)+(top.kind==='gain'||top.kind==='drop' ? ' ('+(x.change>=0?'+':'-')+Math.abs(x.change*100).toFixed(1)+'%)' : ''));
+  const lines = topItems.slice(0, 5).map((x,k)=>isWorth() ? '#'+(k+1)+' '+topName(x)+' '+signMoney(x.profit)+' (raw '+topMoney(x.best)+' → PSA 10 '+topMoney(x.g10)+')' : '#'+(k+1)+' '+x.name+' '+money(fromUsd(x.best), x.best >= 1000 ? 0 : 2)+(top.kind==='gain'||top.kind==='drop' ? ' ('+(x.change>=0?'+':'-')+Math.abs(x.change*100).toFixed(1)+'%)' : ''));
   const cap = head+'\n'+lines.join('\n')+'\n'+GAMES[game].tag+' #breakcheck pokesnipr.com';
   const done = ()=>{ $('statusTop').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusTop').textContent = cap; };
   try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }

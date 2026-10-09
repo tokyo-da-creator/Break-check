@@ -38,6 +38,12 @@ jobs:
         env:
           MOVERS_MODE: ${{ github.event_name == 'schedule' && 'full' || 'carry' }}
         run: python scripts/build_movers.py
+      - name: Build PSA 10 values (weekly, CardOS)
+        # Mondays fetch the top 500 English cards' PSA 10 values (5 credits); other runs reuse the live file.
+        continue-on-error: true
+        env:
+          CARDOS_API_KEY: ${{ secrets.CARDOS_API_KEY }}
+        run: python scripts/build_grades.py
       - name: Build page
         run: python scripts/build_site.py
       - name: Deploy to Cloudflare
