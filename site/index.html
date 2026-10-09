@@ -288,6 +288,36 @@ footer .f-bottom a:hover{text-decoration:underline}
 .print{animation:printIn .8s cubic-bezier(.2,.8,.2,1)}
 .results li[role=option]{animation:rise .22s ease-out both}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+/* ---------- PSA sales ---------- */
+.certrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.certrow .btn{flex:none;min-height:52px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+input.txt{font-family:var(--body);font-weight:600;font-size:16px}
+#psaGrade{min-height:52px}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted);cursor:pointer}
+.check input{width:20px;height:20px;min-height:0;padding:0;accent-color:var(--win)}
+#psaWhere .chip[aria-pressed="true"]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
+.psafeed{display:flex;flex-direction:column;gap:14px;border-top:1px dashed var(--line);padding-top:22px}
+.feedhead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px}
+.feedhead h2{margin:0;font:400 28px Anton,var(--body);letter-spacing:.03em;text-transform:uppercase}
+.feedhead h2::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--win);margin-right:10px;vertical-align:middle;box-shadow:0 0 0 4px rgba(163,230,53,.18)}
+.feedgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.feedgrid .empty-state{grid-column:1/-1}
+.sale{display:flex;flex-direction:column;border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;background:var(--surface);text-decoration:none;color:var(--fg);transition:transform .18s ease,border-color .18s ease}
+.sale:hover{transform:translateY(-3px);border-color:rgba(163,230,53,.45)}
+.sale img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:#0B0B0B}
+.sale .sb{display:flex;flex-direction:column;gap:3px;padding:10px 12px 12px}
+.sale .sp{font:400 26px/1 Anton,var(--body);color:var(--win);letter-spacing:.02em}
+.sale .sp small{font:600 11px var(--mono);color:var(--muted);margin-left:6px;letter-spacing:.06em}
+.sale .sn{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sale .sm{font:600 11px var(--mono);color:var(--muted);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sale .sv{color:var(--win)}
+@media (min-width:640px){.feedgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){
+  .psafeed{grid-column:1/-1}
+  .feedgrid{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+
 /* ---------- layout: phone first, a proper two-column desktop app from 1024px ---------- */
 .col-in,.col-out{display:flex;flex-direction:column;gap:24px;min-width:0}
 .lede{display:none}
@@ -304,11 +334,11 @@ header.top .tabs{margin-top:18px}
   header.top .kicker{display:none}
   header.top .mascot{--m:48px}
   header.top .mark{font-size:28px}
-  header.top .tabs{grid-template-columns:repeat(5,1fr);margin:0;justify-self:center;width:100%;max-width:680px;grid-column:3;grid-row:1}
+  header.top .tabs{grid-template-columns:repeat(6,auto);margin:0;justify-self:center;width:auto;max-width:900px;grid-column:3;grid-row:1}
   header.top .brand{grid-column:1;grid-row:1}
   header.top .games{margin:0;grid-column:2;grid-row:1}
   header.top .games button{flex:none;min-height:34px;font-size:13px}
-  header.top .tabs button{min-height:38px;font-size:14px}
+  header.top .tabs button{min-height:38px;font-size:14px;white-space:nowrap;padding:0 11px}
   header.top .headrow{display:contents}
   header.top .tag{display:none}
   header.top .live{display:none}
@@ -339,6 +369,7 @@ header.top .tabs{margin-top:18px}
 /* tier list editor */
 .tabs button:last-of-type:nth-of-type(odd){grid-column:1/-1}
 @media (min-width:1024px){header.top .tabs button:last-of-type:nth-of-type(odd){grid-column:auto}}
+@media (min-width:1024px) and (max-width:1279px){header.top .tabs{grid-row:2;grid-column:1/-1;width:100%;max-width:none;grid-template-columns:repeat(6,minmax(0,1fr))}}
 .tboard{display:flex;flex-direction:column;gap:8px}
 .trow{display:grid;grid-template-columns:72px minmax(0,1fr);border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));border-radius:12px;overflow:hidden;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 14%,transparent),transparent 60%),var(--surface);min-height:84px}
 .trow.drop{outline:2px solid var(--c);outline-offset:-2px}
@@ -516,6 +547,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       <button id="tab-check" role="tab" aria-selected="true" aria-controls="panel-check">Check a price</button>
       <button id="tab-log" role="tab" aria-selected="false" aria-controls="panel-log">Log my pulls</button>
       <button id="tab-show" role="tab" aria-selected="false" aria-controls="panel-show">Show a card</button>
+      <button id="tab-psa" role="tab" aria-selected="false" aria-controls="panel-psa">PSA sales</button>
       <button id="tab-top" role="tab" aria-selected="false" aria-controls="panel-top">Top lists</button>
       <button id="tab-tier" role="tab" aria-selected="false" aria-controls="panel-tier">Tier list</button>
     </div>
@@ -881,6 +913,67 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       <div class="holo" id="showHolo"><img id="showImg" alt="Card spotlight share image"></div>
     </div>
    </div>
+  </section>
+
+  <!-- PSA SALES -->
+  <section class="panel" id="panel-psa" role="tabpanel" aria-labelledby="tab-psa" hidden>
+   <div class="col-in">
+    <div class="step">
+      <div class="stephead"><span class="num">1</span><label for="psaCert">PSA cert number</label></div>
+      <div class="certrow">
+        <input id="psaCert" type="text" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="e.g. 176910999">
+        <button class="btn" id="psaLook" type="button">Look up</button>
+      </div>
+      <div class="hint" id="psaCertHint">The number on the slab label, under the grade. Looking it up fills in the card and its PSA photo.</div>
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">2</span>The card</div>
+      <div class="field"><label for="psaName">Card</label><input id="psaName" type="text" maxlength="90" placeholder="Monkey D. Luffy" class="txt"></div>
+      <div class="field"><label for="psaSet">Year and set</label><input id="psaSet" type="text" maxlength="90" placeholder="2026 One Piece JP" class="txt"></div>
+      <div class="field"><label for="psaVariety">Variety or edition (optional)</label><input id="psaVariety" type="text" maxlength="90" placeholder="PCC Nike Collab Edition" class="txt"></div>
+      <div class="pair">
+        <div class="field"><label for="psaNum">Card number</label><input id="psaNum" type="text" maxlength="20" placeholder="099" class="txt"></div>
+        <div class="field"><label for="psaGrade">Grade</label><select id="psaGrade" class="sel"></select></div>
+      </div>
+      <div class="field"><label for="psaPop">PSA population at this grade (optional)</label><input id="psaPop" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 37"></div>
+      <div class="row-photo">
+        <button class="btn sm" id="psaPhotoBtn" type="button">Use my own slab photo</button>
+        <button class="linkbtn" id="psaPhotoClear" type="button" hidden>Remove photo</button>
+        <input type="file" id="psaPhotoFile" accept="image/*" hidden>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">3</span><label for="psaPrice">What it sold for</label></div>
+      <div class="money bigin" id="psaMoney"><input id="psaPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label for="psaDate">Date sold</label><input id="psaDate" type="date"></div>
+      <div class="chips" id="psaWhere" role="group" aria-label="Where it sold"></div>
+      <label class="check"><input type="checkbox" id="psaFeedOn" checked> Add it to Recent PSA sales when I share the link</label>
+      <button class="clearbtn" id="clearPsa" type="button">Clear</button>
+    </div>
+   </div>
+   <div class="col-out">
+    <div class="result" aria-live="polite">
+      <div class="stephead"><span class="num">4</span>Sale card</div>
+      <div class="empty-state" id="psaEmpty">Enter a cert number or the card details, then what it sold for. Your sale card shows up here.</div>
+      <div id="psaOut" style="display:flex;flex-direction:column;gap:12px" hidden>
+        <div class="creator" data-creator></div>
+        <div class="btns">
+          <button class="btn primary" id="sharePsa" type="button">Share link</button>
+          <button class="btn" id="savePsa" type="button">Save image</button>
+          <button class="btn" id="copyPsa" type="button">Copy caption</button>
+        </div>
+      </div>
+      <div class="status" id="statusPsa"></div>
+    </div>
+    <div class="preview" id="psaPreview" hidden>
+      <div class="eyebrow">PSA sale · square, sized for X<span class="touch-only"> · press and hold to save</span></div>
+      <div class="holo"><img id="psaImg" alt="PSA sale share image"></div>
+    </div>
+   </div>
+   <section class="psafeed" aria-labelledby="psaFeedHead">
+     <div class="feedhead"><h2 id="psaFeedHead">Recent PSA sales</h2><span class="hint">Shared on Break Check. Prices as reported by the seller.</span></div>
+     <ul class="feedgrid" id="psaFeed"><li class="empty-state">No sales shared yet. Make a sale card and share the link to put the first one here.</li></ul>
+   </section>
   </section>
 
   <div class="zoom" id="zoom" hidden role="dialog" aria-label="Product image"><div class="holo" id="zoomHolo"><img id="zoomImg" alt=""></div><p>Tap anywhere to close</p></div>
@@ -3990,14 +4083,15 @@ $('saveBreak').addEventListener('click', ()=>{
 
 // ---------- tabs ----------
 function showTab(t){
-  if(!['check','log','show','top','tier'].includes(t)) t = 'check';
+  if(!['check','log','show','psa','top','tier'].includes(t)) t = 'check';
   const isCheck = t==='check';
-  ['check','log','show','top','tier'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
+  ['check','log','show','psa','top','tier'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
   const changed = store.get('tab') !== t;
   if(changed) replay($('panel-'+t), 'enter');
   if(t==='show') updateShow();
   if(t==='top') openTop();
   if(t==='tier') openTier();
+  if(t==='psa') openPsa();
   store.set('tab', t);
 }
 $('tab-check').addEventListener('click',()=>showTab('check'));
@@ -4005,6 +4099,7 @@ $('tab-log').addEventListener('click',()=>showTab('log'));
 $('tab-show').addEventListener('click',()=>showTab('show'));
 $('tab-top').addEventListener('click',()=>showTab('top'));
 $('tab-tier').addEventListener('click',()=>showTab('tier'));
+$('tab-psa').addEventListener('click',()=>showTab('psa'));
 
 // ---------- inputs ----------
 $('pay').addEventListener('input',()=>{ markEdited('check'); updateCheck(); });
@@ -4173,6 +4268,219 @@ $('shareReceipt').addEventListener('click',()=>{
     items, verified: d.v.ok, currency: cur, priced: today
   }, headNumber(d)+(d.r.net>=0?' profit':' loss')+' ('+cur+')', $('statusLog'), drawBreakCard(d) || drawReceipt(d), drawBreakCard(d) || drawReceiptWide(d));
 });
+
+// ---------- PSA sales: a sale card for X, plus the Recent PSA sales feed ----------
+const PSA_GRADES = [['10','GEM MT 10'],['9','MINT 9'],['8','NM-MT 8'],['7','NM 7'],['6','EX-MT 6'],['5','EX 5'],['4','VG-EX 4'],['3','VG 3'],['2','GOOD 2'],['1.5','FR 1.5'],['1','PR 1'],['A','AUTHENTIC']];
+const PSA_WHERE = ['eBay', 'Whatnot', 'Fanatics Collect', 'Goldin', 'Courtyard', 'Card show', 'In person'];
+const psa = Object.assign({cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date:'', where:'eBay', feed:true, verified:false, front:null}, store.get('psa1') || {});
+let psaPhoto = null; const psaPhotoImg = new Image(); psaPhotoImg.onload = ()=>updatePsa();
+const psaFrontImg = new Image(); psaFrontImg.onload = ()=>updatePsa(); psaFrontImg.onerror = ()=>{ psa.front = null; updatePsa(); };
+let psaFeedLoaded = false, tPsa = 0;
+function savePsaState(){ const {verified, ...rest} = psa; store.set('psa1', {...rest, verified}); }
+PSA_GRADES.forEach(([v, t])=>{ const o = document.createElement('option'); o.value = v; o.textContent = 'PSA '+t; $('psaGrade').append(o); });
+PSA_WHERE.forEach(w=>{ const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = w; b.dataset.w = w;
+  b.addEventListener('click', ()=>{ psa.where = psa.where === w ? '' : w; savePsaState(); updatePsa(); }); $('psaWhere').append(b); });
+const psaFields = {psaCert:'cert', psaName:'name', psaSet:'set', psaVariety:'variety', psaNum:'num', psaPop:'pop', psaPrice:'price', psaDate:'date'};
+function paintPsaInputs(){
+  Object.entries(psaFields).forEach(([id, k])=>{ if($(id).value !== String(psa[k] ?? '')) $(id).value = psa[k] ?? ''; });
+  $('psaGrade').value = psa.grade || '10'; $('psaFeedOn').checked = psa.feed !== false;
+}
+if(!psa.date) psa.date = todayISO();
+paintPsaInputs();
+Object.entries(psaFields).forEach(([id, k])=>$(id).addEventListener('input', ()=>{
+  psa[k] = $(id).value;
+  if(k === 'cert'){ psa[k] = $(id).value.replace(/\D/g, ''); if($(id).value !== psa[k]) $(id).value = psa[k]; }
+  // Hand edits to the card details mean it is no longer exactly what PSA returned.
+  if(['name','set','variety','num','pop','cert'].includes(k)) psa.verified = false;
+  savePsaState(); updatePsa(); }));
+$('psaGrade').addEventListener('change', ()=>{ psa.grade = $('psaGrade').value; psa.verified = false; savePsaState(); updatePsa(); });
+$('psaFeedOn').addEventListener('change', ()=>{ psa.feed = $('psaFeedOn').checked; savePsaState(); });
+$('psaCert').addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); lookupPsa(); } });
+$('psaLook').addEventListener('click', lookupPsa);
+function gradeFrom(text){ const m = String(text||'').match(/(\d+(?:\.5)?)\s*$/) || String(text||'').match(/\b(10|[1-9](?:\.5)?)\b/); if(m) return m[1]; return /auth/i.test(text||'') ? 'A' : '10'; }
+async function lookupPsa(){
+  const n = psa.cert, hint = $('psaCertHint'), btn = $('psaLook');
+  if(!/^\d{6,12}$/.test(n)){ hint.textContent = 'A PSA cert number is 6 to 12 digits, from the slab label.'; $('psaCert').focus(); return; }
+  btn.disabled = true; btn.textContent = 'Looking up…';
+  try{
+    const r = await fetch('/api/psa/cert/'+n), d = await r.json();
+    if(d.error === 'not_configured'){ hint.textContent = 'PSA lookup isn’t switched on yet. Type the card details in below and add your own slab photo.'; return; }
+    if(!r.ok || d.error){ hint.textContent = d.error || 'PSA didn’t answer. Type the details in instead.'; return; }
+    Object.assign(psa, {name: [d.subject].filter(Boolean).join(' '), set: [d.year, d.brand].filter(Boolean).join(' '), variety: d.variety || '', num: d.number || '',
+      grade: gradeFrom(d.grade), pop: d.pop != null ? String(d.pop) : '', verified: true, front: d.front || null});
+    paintPsaInputs(); savePsaState(); loadPsaFront();
+    hint.textContent = '✓ Found on PSA: '+[d.year, d.brand, d.subject].filter(Boolean).join(' ')+' · '+(d.grade || '')+'.';
+  }catch(e){ hint.textContent = 'Couldn’t reach PSA. Type the details in instead.'; }
+  finally{ btn.disabled = false; btn.textContent = 'Look up'; updatePsa(); }
+}
+function loadPsaFront(){ if(psa.front){ if(psaFrontImg.getAttribute('src') !== psa.front) psaFrontImg.src = psa.front; } else psaFrontImg.removeAttribute('src'); }
+loadPsaFront();
+$('psaPhotoBtn').addEventListener('click', ()=>$('psaPhotoFile').click());
+$('psaPhotoFile').addEventListener('change', async ()=>{
+  const f = $('psaPhotoFile').files && $('psaPhotoFile').files[0]; if(!f) return;
+  try{ const bmp = await createImageBitmap(f), k = Math.min(1, 1600/Math.max(bmp.width, bmp.height)), c = document.createElement('canvas'); c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); psaPhoto = c.toDataURL('image/jpeg', 0.92); psaPhotoImg.src = psaPhoto; $('psaPhotoClear').hidden = false; }
+  catch(e){ $('statusPsa').textContent = 'That photo couldn’t be opened. Try another.'; }
+  $('psaPhotoFile').value = '';
+});
+$('psaPhotoClear').addEventListener('click', ()=>{ psaPhoto = null; psaPhotoImg.removeAttribute('src'); $('psaPhotoClear').hidden = true; updatePsa(); });
+$('clearPsa').addEventListener('click', ()=>{
+  Object.assign(psa, {cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date: todayISO(), where:'eBay', verified:false, front:null});
+  psaPhoto = null; psaPhotoImg.removeAttribute('src'); $('psaPhotoClear').hidden = true; loadPsaFront();
+  $('psaCertHint').textContent = 'The number on the slab label, under the grade. Looking it up fills in the card and its PSA photo.';
+  paintPsaInputs(); savePsaState(); updatePsa();
+});
+const psaGradeText = v => (PSA_GRADES.find(g=>g[0] === v) || PSA_GRADES[0])[1];
+function psaTitle(){ return [psa.name, psa.variety ? '('+psa.variety+')' : ''].filter(Boolean).join(' '); }
+function psaSoldLabel(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||'')) return ''; return new Date(iso+'T00:00:00Z').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}); }
+function psaArt(){
+  if(psaPhoto && psaPhotoImg.complete && psaPhotoImg.naturalWidth) return {img: psaPhotoImg, photo: true};
+  if(psa.front && psaFrontImg.complete && psaFrontImg.naturalWidth) return {img: psaFrontImg, photo: false};
+  return null;
+}
+function psaReady(){ return psa.name.trim() && num(psa.price) > 0; }
+function psaMoney(v){ return money(v, v >= 1000 || Math.abs(v - Math.round(v)) < 0.005 ? 0 : 2); }
+
+// Stylised slab for when there is no photo: clear case, label strip with the real details, the mascot in the card window.
+function drawSlab(ctx, x, y, w, h, rnd){
+  ctx.save();
+  ctx.shadowColor = 'rgba(163,230,53,.28)'; ctx.shadowBlur = 90; rrect(ctx, x, y, w, h, w*0.05); ctx.fillStyle = '#0A0D06'; ctx.fill(); ctx.restore();
+  const case_ = ctx.createLinearGradient(x, y, x + w, y + h); case_.addColorStop(0, 'rgba(255,255,255,.14)'); case_.addColorStop(.45, 'rgba(255,255,255,.04)'); case_.addColorStop(1, 'rgba(255,255,255,.10)');
+  rrect(ctx, x, y, w, h, w*0.05); ctx.fillStyle = case_; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
+  const p = w*0.06, lx = x + p, ly = y + p, lw = w - p*2, lh = h*0.17;
+  rrect(ctx, lx, ly, lw, lh, 10); ctx.fillStyle = '#A3E635'; ctx.fill();
+  ctx.fillStyle = '#0C1204'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const fs = Math.round(lh*0.15); ctx.font = '700 '+fs+'px "JetBrains Mono"';
+  const lines = [psa.set, psa.name, psa.variety].filter(Boolean).map(t=>t.toUpperCase());
+  lines.slice(0, 3).forEach((t, i)=>ctx.fillText(clip(ctx, t, lw*0.66), lx + lw*0.05, ly + lh*0.3 + i*fs*1.35));
+  ctx.textAlign = 'right'; ctx.font = '400 '+Math.round(lh*0.36)+'px Anton'; const gv = psa.grade === 'A' ? 'AUTH' : psa.grade;
+  ctx.fillText(gv, lx + lw*0.95, ly + lh*0.58); ctx.font = '700 '+Math.round(fs*0.9)+'px "JetBrains Mono"';
+  ctx.fillText(psaGradeText(psa.grade).replace(/\s*[\d.]+$/, ''), lx + lw*0.95, ly + lh*0.82);
+  ctx.textAlign = 'left'; if(psa.cert){ ctx.fillText('#'+psa.cert, lx + lw*0.05, ly + lh*0.88); } ctx.textAlign = 'left';
+  const cx = lx + p*0.3, cy = ly + lh + p*0.8, cw = lw - p*0.6, ch = y + h - p - cy;
+  rrect(ctx, cx, cy, cw, ch, 14); ctx.fillStyle = '#060806'; ctx.fill(); ctx.save(); rrect(ctx, cx, cy, cw, ch, 14); ctx.clip();
+  const m = moodImg('fire'); if(m){ const k = Math.max(cw/m.naturalWidth, ch/m.naturalHeight)*1.05; ctx.drawImage(m, cx + (cw - m.naturalWidth*k)/2, cy + (ch - m.naturalHeight*k)/2, m.naturalWidth*k, m.naturalHeight*k); }
+  else { ctx.font = '400 '+Math.round(cw*0.2)+'px Anton'; ctx.fillStyle = 'rgba(163,230,53,.25)'; ctx.textAlign = 'center'; ctx.fillText('PSA '+gv, cx + cw/2, cy + ch/2); ctx.textAlign = 'left'; }
+  const shine = ctx.createLinearGradient(cx, cy, cx + cw, cy + ch); shine.addColorStop(.3, 'rgba(255,255,255,0)'); shine.addColorStop(.48, 'rgba(255,255,255,.12)'); shine.addColorStop(.56, 'rgba(255,255,255,0)'); ctx.fillStyle = shine; ctx.fillRect(cx, cy, cw, ch);
+  ctx.restore();
+}
+function drawPsaSale(wide){
+  if(!bcFonts() || !psaReady()) return null;
+  const W = wide ? 1200 : 1080, H = wide ? 630 : 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), rnd = bcRand((Number(psa.cert) || psa.name.length*97) % 100000 + 21), INK = '#F4F4F5', soft = 'rgba(244,244,245,.64)', faint = 'rgba(244,244,245,.4)', LIME = '#A3E635';
+  const price = num(psa.price), art = psaArt(), M = wide ? 48 : 56;
+  ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, W, H);
+  // picture area (right)
+  const PX = wide ? 700 : 560, PY = wide ? 40 : 70, PW = W - M - PX + (wide ? 0 : 8), PH = H - PY - (wide ? 40 : 96);
+  const glow = ctx.createRadialGradient(PX + PW/2, PY + PH*0.45, 10, PX + PW/2, PY + PH*0.45, PW*0.95);
+  glow.addColorStop(0, 'rgba(163,230,53,.20)'); glow.addColorStop(1, 'rgba(163,230,53,0)'); ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+  if(art){
+    const im = art.img, iw = im.naturalWidth, ih = im.naturalHeight, k = Math.min(PW/iw, PH/ih), w = iw*k, h = ih*k, x = PX + (PW - w)/2, y = PY + (PH - h)/2, r = Math.min(w, h)*0.04;
+    ctx.save(); ctx.shadowColor = 'rgba(163,230,53,.35)'; ctx.shadowBlur = 90; rrect(ctx, x, y, w, h, r); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 22; rrect(ctx, x, y, w, h, r); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    ctx.save(); rrect(ctx, x, y, w, h, r); ctx.clip(); ctx.drawImage(im, x, y, w, h);
+    const sh = ctx.createLinearGradient(x, y, x + w, y + h); sh.addColorStop(.25, 'rgba(255,255,255,0)'); sh.addColorStop(.4, 'rgba(255,255,255,.10)'); sh.addColorStop(.5, 'rgba(255,255,255,0)'); ctx.fillStyle = sh; ctx.fillRect(x, y, w, h);
+    ctx.restore();
+  } else {
+    const sw = Math.min(PW, PH*0.6), sh = sw/0.6; drawSlab(ctx, PX + (PW - sw)/2, PY + (PH - sh)/2, sw, sh, rnd);
+  }
+  // header
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const hy = wide ? 40 : 46;
+  if(brandIcon.complete && brandIcon.naturalWidth) ctx.drawImage(brandIcon, M, hy, 48, 48);
+  ctx.font = '400 28px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', M + 60, hy + 32); spaced(ctx, 0);
+  ctx.font = '700 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = LIME; ctx.fillText('PSA SALE', M + 62, hy + 50); spaced(ctx, 0);
+  // sold stamp + price
+  const LW = PX - M - (wide ? 40 : 44);
+  let y = wide ? 186 : 318;
+  rrect(ctx, M, y - 30, 98, 40, 8); ctx.fillStyle = LIME; ctx.fill();
+  ctx.font = '700 17px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = '#0C1204'; ctx.fillText('SOLD', M + 18, y - 3); spaced(ctx, 0);
+  const sold = psaSoldLabel(psa.date);
+  ctx.font = '600 22px Archivo'; ctx.fillStyle = soft; ctx.fillText(clip(ctx, [sold, psa.where ? 'on '+psa.where : ''].filter(Boolean).join(' · '), LW - 116), M + 116, y - 2);
+  const pt = psaMoney(price); y += wide ? 118 : 168;
+  const ps = fit(ctx, pt, '400 {s}px Anton', wide ? 136 : 210, LW);
+  ctx.save(); ctx.fillStyle = LIME; ctx.shadowColor = 'rgba(163,230,53,.45)'; ctx.shadowBlur = 40; ctx.fillText(pt, M - ps*0.02, y); ctx.restore();
+  ctx.font = '700 16px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText(cur, M + 2, y + 30); spaced(ctx, 0);
+  // card + grade
+  y += wide ? 70 : 104;
+  const gText = psa.grade === 'A' ? 'AUTH' : 'PSA '+psa.grade, gSub = psaGradeText(psa.grade).replace(/\s*[\d.]+$/, '');
+  ctx.font = '400 '+(wide ? 40 : 52)+'px Anton'; const gw = ctx.measureText(gText).width + 40, gh = wide ? 58 : 74;
+  rrect(ctx, M, y - gh*0.74, gw, gh, 12); ctx.lineWidth = 3; ctx.strokeStyle = LIME; ctx.stroke(); ctx.fillStyle = INK; ctx.fillText(gText, M + 20, y + (wide ? 0 : 2));
+  ctx.font = '700 '+(wide ? 15 : 17)+'px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = LIME; ctx.fillText(gSub, M + gw + 16, y - (wide ? 18 : 22)); spaced(ctx, 0);
+  if(num(psa.pop) >= 0 && psa.pop !== ''){ ctx.font = '600 '+(wide ? 15 : 17)+'px "JetBrains Mono"'; ctx.fillStyle = soft; ctx.fillText('POP '+Number(psa.pop).toLocaleString('en-US'), M + gw + 16, y + 2); }
+  y += wide ? 54 : 74;
+  const nf = wide ? 30 : 40; ctx.font = '800 '+nf+'px Archivo'; ctx.fillStyle = INK;
+  const nameLines = wrapLines(ctx, psa.name, LW, 2); nameLines.forEach((l, i)=>ctx.fillText(l, M, y + i*nf*1.15)); y += (nameLines.length - 1)*nf*1.15;
+  const sub = [psa.set, psa.num ? '#'+psa.num.replace(/^#/, '') : ''].filter(Boolean).join('  ·  ').toUpperCase();
+  ctx.font = '600 '+(wide ? 14 : 16)+'px "JetBrains Mono"'; spaced(ctx, 1.5); ctx.fillStyle = soft; if(sub){ y += wide ? 30 : 38; ctx.fillText(clip(ctx, sub, LW), M, y); }
+  if(psa.variety){ y += wide ? 24 : 30; ctx.fillStyle = LIME; ctx.fillText(clip(ctx, psa.variety.toUpperCase(), LW), M, y); } spaced(ctx, 0);
+  // footer
+  const fy = H - (wide ? 30 : 44);
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(M, fy - (wide ? 30 : 40), W - M*2, 1);
+  ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 2.5);
+  const ver = psa.verified && psa.cert ? '✓ PSA CERT #'+psa.cert+' CHECKED' : psa.cert ? 'PSA CERT #'+psa.cert+' · DETAILS SELF-REPORTED' : 'DETAILS SELF-REPORTED';
+  ctx.fillStyle = psa.verified ? LIME : faint; ctx.fillText(ver+'  ·  PRICE AS REPORTED', M, fy);
+  ctx.textAlign = 'right'; ctx.fillStyle = faint; ctx.fillText('POKESNIPR.COM', W - M, fy); ctx.textAlign = 'left'; spaced(ctx, 0);
+  if(creatorOn() && !wide) drawCreator(ctx, W - M, hy + 2, 46, {align: 'right', font: '700 22px Archivo', ring: LIME});
+  grainVignette(ctx, rnd, .025, .3);
+  return cv;
+}
+function updatePsa(){
+  { moodImg('fire'); const mi = moodCache.fire; if(mi && !mi.complete) mi.addEventListener('load', ()=>updatePsa(), {once: true}); }
+  document.querySelectorAll('#psaWhere .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.w === psa.where));
+  $('psaMoney').dataset.cur = cur;
+  const ok = psaReady();
+  $('psaEmpty').hidden = !!ok; $('psaOut').hidden = !ok; if(!ok) $('psaPreview').hidden = true;
+  if(!ok) return null;
+  clearTimeout(tPsa); tPsa = setTimeout(()=>{ const cv = drawPsaSale(false); if(cv){ $('psaImg').src = cv.toDataURL('image/jpeg', 0.9); $('psaPreview').hidden = false; } else { $('psaPreview').hidden = true; setTimeout(updatePsa, 300); } }, 120);
+  return true;
+}
+function psaCaption(){
+  const g = psa.grade === 'A' ? 'PSA Authentic' : 'PSA '+psa.grade;
+  return g+' '+psaTitle()+' sold for '+psaMoney(num(psa.price))+' '+cur+(psa.where ? ' on '+psa.where : '')+(psa.date ? ' ('+psaSoldLabel(psa.date)+')' : '')+'. #PSA #TCG #breakcheck';
+}
+$('savePsa').addEventListener('click', ()=>{ const cv = drawPsaSale(false); if(cv) save(cv, 'psa-sale'+(psa.cert ? '-'+psa.cert : '')+'.png', $('statusPsa')); });
+$('copyPsa').addEventListener('click', ()=>{
+  if(!psaReady()) return; const cap = psaCaption();
+  try{ navigator.clipboard.writeText(cap).then(()=>{ $('statusPsa').textContent = 'Caption copied.'; }, ()=>{ $('statusPsa').textContent = cap; }); }catch(e){ $('statusPsa').textContent = cap; }
+});
+$('sharePsa').addEventListener('click', async ()=>{
+  const card = drawPsaSale(false), og = drawPsaSale(true); if(!card || !og) return;
+  const price = psaMoney(num(psa.price)), g = psa.grade === 'A' ? 'PSA Authentic' : 'PSA '+psaGradeText(psa.grade);
+  await shareLink($('sharePsa'), {
+    kind: 'psa', title: g+' '+psaTitle()+' sold for '+price,
+    desc: [psa.set, psa.num ? '#'+psa.num : ''].filter(Boolean).join(' ')+'. Sold '+(psa.where ? 'on '+psa.where+' ' : '')+psaSoldLabel(psa.date)+'.',
+    currency: cur, feed: psa.feed !== false,
+    psa: {cert: psa.cert, name: psaTitle(), grade: g, set: [psa.set, psa.num ? '#'+psa.num : ''].filter(Boolean).join(' '), price: num(psa.price), sold: psa.date, where: psa.where},
+    items: [
+      {name: 'Sold for', detail: [psa.where, psaSoldLabel(psa.date)].filter(Boolean).join(' · ')+' · as reported', value: price+' '+cur, verified: false},
+      {name: 'Grade', detail: psa.cert ? 'PSA cert #'+psa.cert : 'PSA', value: g, verified: !!psa.verified},
+      ...(psa.pop !== '' && num(psa.pop) >= 0 ? [{name: 'Population', detail: 'PSA graded at this grade', value: Number(psa.pop).toLocaleString('en-US'), verified: !!psa.verified}] : [])
+    ]
+  }, psaCaption(), $('statusPsa'), card, og);
+  if(psa.feed !== false) setTimeout(loadPsaFeed, 600);
+});
+async function loadPsaFeed(){
+  try{
+    const d = await (await fetch('/api/psa/feed', {cache: 'no-store'})).json(), list = d.sales || [];
+    psaFeedLoaded = true; if(!list.length) return;
+    const ul = $('psaFeed'); ul.textContent = '';
+    list.slice(0, 18).forEach(s=>{
+      const li = document.createElement('li'), a = document.createElement('a'); a.className = 'sale'; a.href = '/r/'+s.id; a.target = '_blank'; a.rel = 'noopener';
+      const img = document.createElement('img'); img.src = '/i/'+s.id+'/card'; img.alt = ''; img.loading = 'lazy'; img.onerror = ()=>{ li.remove(); };
+      const b = document.createElement('div'); b.className = 'sb';
+      const p = document.createElement('div'); p.className = 'sp'; p.textContent = s.price != null ? '$'+Number(s.price).toLocaleString('en-US', {maximumFractionDigits: s.price >= 1000 ? 0 : 2}) : '—';
+      const c = document.createElement('small'); c.textContent = s.cur || ''; p.append(c);
+      const n = document.createElement('div'); n.className = 'sn'; n.textContent = s.title || '';
+      const m = document.createElement('div'); m.className = 'sm';
+      if(s.verified){ const v = document.createElement('span'); v.className = 'sv'; v.textContent = '✓ '; v.title = 'Card checked against its PSA cert'; m.append(v); }
+      m.append([s.grade, psaSoldLabel(s.sold), s.where].filter(Boolean).join(' · '));
+      b.append(p, n, m); a.append(img, b); li.append(a); ul.append(li);
+    });
+  }catch(e){}
+}
+function openPsa(){ updatePsa(); if(!psaFeedLoaded) loadPsaFeed(); }
+holo($('psaPreview').querySelector('.holo'));
 
 // ---------- restore + boot ----------
 const sc = store.get('check3');

@@ -215,6 +215,78 @@ async function xAvatar(url, ctx) {
   return res;
 }
 
+// ---- PSA sales: cert lookup (label details + PSA's own slab photos) and the Recent PSA sales feed ----
+// PSA's Public API is free with a PSA account token (Worker secret PSA_API_TOKEN). It has no prices:
+// the sale price on a card is always what the seller entered. Lookups are kept 30 days in KV.
+const PSA_API = "https://api.psacard.com/publicapi";
+const CERT_RE = /^\d{6,12}$/;
+const FEED_KEY = "psa/feed";
+const FEED_MAX = 36;
+const pubCert = (row) => { const { img, ...rest } = row; return { ...rest, front: img ? `/api/psa/img/${row.cert}` : null }; };
+async function psaCert(n, env, ctx) {
+  if (!CERT_RE.test(n)) return json({ error: "A PSA cert number is 6 to 12 digits." }, 400);
+  const key = `psa/cert/${n}`;
+  const hit = await env.SHARES.get(key, "json");
+  if (hit) return json(pubCert(hit), 200, { "Cache-Control": "no-store" });
+  if (!env.PSA_API_TOKEN) return json({ error: "not_configured" }, 200, { "Cache-Control": "no-store" });
+  const H = { Authorization: `bearer ${env.PSA_API_TOKEN}`, Accept: "application/json" };
+  let c;
+  try {
+    const r = await fetch(`${PSA_API}/cert/GetByCertNumber/${n}`, { headers: H });
+    if (r.status === 401 || r.status === 403) return json({ error: "not_configured" }, 200);
+    if (r.status === 429) return json({ error: "PSA’s lookups are used up for today. Type the details in instead." }, 429);
+    if (r.status === 404) return json({ error: "PSA has no cert with that number." }, 404);
+    if (!r.ok) return json({ error: "PSA didn’t answer. Try again, or type the details in." }, 502);
+    c = (await r.json())?.PSACert;
+  } catch { return json({ error: "PSA didn’t answer. Try again, or type the details in." }, 502); }
+  if (!c || !c.CertNumber) return json({ error: "PSA has no cert with that number." }, 404);
+  let img = null;
+  try {
+    const r = await fetch(`${PSA_API}/cert/GetImagesByCertNumber/${n}`, { headers: H });
+    if (r.ok) { const list = await r.json(); const f = (Array.isArray(list) ? list : []).find((i) => i && i.IsFrontImage) || (Array.isArray(list) ? list[0] : null);
+      if (f && /^https:\/\//.test(f.ImageURL || "")) img = f.ImageURL; }
+  } catch {}
+  const row = {
+    cert: String(c.CertNumber), year: clean(String(c.Year ?? ""), 12), brand: clean(c.Brand, 90), subject: clean(c.Subject, 90),
+    variety: clean(c.Variety, 90), number: clean(String(c.CardNumber ?? ""), 20), grade: clean(c.CardGrade || c.GradeDescription, 40),
+    pop: Number.isFinite(c.TotalPopulation) ? c.TotalPopulation : null, popHigher: Number.isFinite(c.PopulationHigher) ? c.PopulationHigher : null,
+    img, verified: true,
+  };
+  ctx.waitUntil(env.SHARES.put(key, JSON.stringify(row), { expirationTtl: 60 * 60 * 24 * 30 }));
+  return json(pubCert(row), 200, { "Cache-Control": "no-store" });
+}
+async function psaImage(n, env, ctx) {
+  if (!CERT_RE.test(n)) return new Response("Not found", { status: 404 });
+  const cache = caches.default, ck = new Request(`https://psaimg.cache/${n}`);
+  const hit = await cache.match(ck);
+  if (hit) return hit;
+  const row = await env.SHARES.get(`psa/cert/${n}`, "json");
+  if (!row || !row.img) return new Response("Not found", { status: 404 });
+  const r = await fetch(row.img, { cf: { cacheTtl: 86400 * 30, cacheEverything: true } });
+  const type = r.headers.get("Content-Type") || "";
+  if (!r.ok || !type.startsWith("image/")) return new Response("Not found", { status: 404 });
+  const res = new Response(r.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=2592000" } });
+  ctx.waitUntil(cache.put(ck, res.clone()));
+  return res;
+}
+async function psaFeed(env) {
+  const list = (await env.SHARES.get(FEED_KEY, "json")) || [];
+  return json({ sales: list }, 200, { "Cache-Control": "public, max-age=60" });
+}
+async function addToFeed(env, id, meta) {
+  const p = meta.psa; if (!p) return;
+  const list = ((await env.SHARES.get(FEED_KEY, "json")) || []).filter((x) => x.id !== id);
+  list.unshift({ id, title: p.name, grade: p.grade, price: p.price, cur: meta.currency || "USD", sold: p.sold, where: p.where, verified: !!p.verified, at: meta.created });
+  await env.SHARES.put(FEED_KEY, JSON.stringify(list.slice(0, FEED_MAX)));
+}
+// The site owner can take a sale off the feed: DELETE /api/psa/feed/<id> with header X-Admin-Key (Worker secret ADMIN_KEY).
+async function removeFromFeed(req, env, id) {
+  if (!env.ADMIN_KEY || req.headers.get("X-Admin-Key") !== env.ADMIN_KEY) return json({ error: "Not allowed." }, 403);
+  const list = ((await env.SHARES.get(FEED_KEY, "json")) || []).filter((x) => x.id !== id);
+  await env.SHARES.put(FEED_KEY, JSON.stringify(list));
+  return json({ ok: true, left: list.length });
+}
+
 async function createShare(req, env) {
   let body;
   try { body = await req.json(); } catch { return json({ error: "Invalid request." }, 400); }
@@ -224,7 +296,7 @@ async function createShare(req, env) {
       })).filter((it) => it.name)
     : [];
   const meta = {
-    kind: body?.kind === "verdict" ? "verdict" : "receipt",
+    kind: body?.kind === "verdict" ? "verdict" : body?.kind === "psa" ? "psa" : "receipt",
     title: clean(body?.title, 90) || "Break Check",
     desc: clean(body?.desc, 220),
     items,
@@ -233,6 +305,21 @@ async function createShare(req, env) {
     priced: clean(body?.priced, 24),
     created: new Date().toISOString(),
   };
+  if (meta.kind === "psa") {
+    const p = body?.psa || {};
+    const cert = CERT_RE.test(String(p.cert || "")) ? String(p.cert) : "";
+    // Verified only when this cert was looked up through PSA (it is in our lookup cache) and the name matches.
+    const known = cert ? await env.SHARES.get(`psa/cert/${cert}`, "json") : null;
+    const name = clean(p.name, 90);
+    const price = Number(p.price);
+    meta.psa = {
+      cert, name, grade: clean(p.grade, 40), set: clean(p.set, 120),
+      price: Number.isFinite(price) && price > 0 && price < 1e8 ? Math.round(price * 100) / 100 : null,
+      sold: /^\d{4}-\d{2}-\d{2}$/.test(p.sold || "") ? p.sold : new Date().toISOString().slice(0, 10),
+      where: clean(p.where, 30), verified: !!(known && known.subject && name.toLowerCase().includes(known.subject.toLowerCase().slice(0, 12))),
+    };
+    meta.feed = body?.feed === true && !!meta.psa.price && !!name;
+  }
   const id = newId();
   await env.SHARES.put(`meta/${id}`, JSON.stringify(meta), { expirationTtl: SHARE_TTL });
   return json({ id, url: `${new URL(req.url).origin}/r/${id}` });
@@ -247,6 +334,10 @@ async function uploadImage(req, env, id, which) {
   const type = isImage(buf);
   if (!type) return json({ error: "Not an image." }, 400);
   await env.SHARES.put(`${which}/${id}`, buf, { expirationTtl: SHARE_TTL, metadata: { type } });
+  if (which === "card") {
+    const meta = JSON.parse((await env.SHARES.get(`meta/${id}`)) || "{}");
+    if (meta.kind === "psa" && meta.feed) await addToFeed(env, id, meta);
+  }
   return json({ ok: true });
 }
 
@@ -265,12 +356,12 @@ function sharePage(origin, id, meta) {
   const card = `${origin}/i/${id}/card`;
   const t = esc(meta.title);
   const d = esc(meta.desc);
-  const cta = meta.kind === "verdict" ? "Check a price yourself" : "Check your own break";
-  const ratio = "16 / 9";
+  const cta = meta.kind === "verdict" ? "Check a price yourself" : meta.kind === "psa" ? "Make your own PSA sale card" : "Check your own break";
+  const ratio = meta.kind === "psa" ? "1 / 1" : "16 / 9";
   const rows = (meta.items || []).map((it) =>
-    `<tr><td><div class="in">${esc(it.name)}</div><div class="id">${esc(it.detail)}</div></td><td class="iv">${esc(it.value)}<div class="${it.verified ? "ok" : "self"}">${it.verified ? "✓ today’s price" : "self-reported"}</div></td></tr>`).join("");
-  const breakdown = rows ? `<section class="bd"><h2>Price breakdown${meta.currency ? ` · ${esc(meta.currency)}` : ""}</h2>
-<p class="small">${meta.kind === "receipt" ? (meta.verified ? "✓ Every value on this receipt came from TCGplayer prices" + (meta.priced ? ` on ${esc(meta.priced)}` : "") + "." : "Some values on this receipt were entered by hand, so it isn’t verified.") : "How this verdict was worked out."}</p>
+    `<tr><td><div class="in">${esc(it.name)}</div><div class="id">${esc(it.detail)}</div></td><td class="iv">${esc(it.value)}<div class="${it.verified ? "ok" : "self"}">${it.verified ? (meta.kind === "psa" ? "✓ PSA cert" : "✓ today’s price") : (meta.kind === "psa" ? "as reported" : "self-reported")}</div></td></tr>`).join("");
+  const breakdown = rows ? `<section class="bd"><h2>${meta.kind === "psa" ? "The sale" : "Price breakdown"}${meta.currency ? ` · ${esc(meta.currency)}` : ""}</h2>
+<p class="small">${meta.kind === "psa" ? (meta.psa?.verified ? "✓ Card and grade checked against PSA cert #" + esc(meta.psa.cert) + ". The sale price is as reported by the seller." : "Card details and sale price as reported by the seller.") : meta.kind === "receipt" ? (meta.verified ? "✓ Every value on this receipt came from TCGplayer prices" + (meta.priced ? ` on ${esc(meta.priced)}` : "") + "." : "Some values on this receipt were entered by hand, so it isn’t verified.") : "How this verdict was worked out."}</p>
 <div class="tw"><table>${rows}</table></div></section>` : "";
   return `<!doctype html>
 <html lang="en">
@@ -361,8 +452,8 @@ function secure(res) {
 // Generous for people, tight enough to stop a script hammering them.
 async function limited(env, req, path) {
   const ip = req.headers.get("CF-Connecting-IP") || "?";
-  const write = path.startsWith("/api/share");
-  const paid = path === "/api/cn/prices" || path === "/api/xavatar";
+  const write = path.startsWith("/api/share") || (path.startsWith("/api/psa/feed/") && req.method === "DELETE");
+  const paid = path === "/api/cn/prices" || path === "/api/xavatar" || path.startsWith("/api/psa/cert/");
   const lim = write || paid ? env.LIMIT_STRICT : env.LIMIT_API;
   if (!lim) return false;
   try { const { success } = await lim.limit({ key: `${write ? "w" : paid ? "p" : "a"}:${ip}` }); return !success; } catch { return false; }
@@ -393,6 +484,13 @@ async function route(req, env, ctx) {
     if (path === "/api/card") return cardData(url, ctx);
     if (path === "/api/cn/prices") return cnPrices(url, env, ctx);
     if (path === "/cnimg") return cnImage(url, ctx);
+    if (path === "/api/psa/feed" && req.method === "GET") return psaFeed(env);
+    let pm = path.match(/^\/api\/psa\/feed\/([A-Za-z0-9]{8,16})$/);
+    if (pm && req.method === "DELETE") return removeFromFeed(req, env, pm[1]);
+    pm = path.match(/^\/api\/psa\/cert\/([^/]{1,20})$/);
+    if (pm) return psaCert(pm[1], env, ctx);
+    pm = path.match(/^\/api\/psa\/img\/(\d{6,12})$/);
+    if (pm) return psaImage(pm[1], env, ctx);
 
     let im = path.match(/^\/img\/(\d{1,9})\/(s|m|l)$/);
     if (im) return productImage(im[1], im[2], ctx);
