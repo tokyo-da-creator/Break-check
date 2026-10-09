@@ -23,6 +23,8 @@ function newId() {
 }
 
 const ID_RE = /^[A-Za-z0-9]{8,16}$/;
+// Revealed-but-unlisted cards (scripts/reveals.py) use ids from here up; TCGplayer has nothing for them yet.
+const REVEAL_BASE = 950_000_000;
 
 // ---- Chinese singles: completed-sale prices from CardOS, fetched per card and kept 24h ----
 const CARDOS = "https://api.getcardos.com/api/v1/pokemon";
@@ -129,7 +131,7 @@ async function liveVariants(id, ctx) {
 }
 async function live(url, ctx) {
   const want = (url.searchParams.get("ids") || "").split(",")
-    .map((s) => s.match(/^(\d{1,9}):([NFV])$/)).filter(Boolean).slice(0, 40);
+    .map((s) => s.match(/^(\d{1,9}):([NFV])$/)).filter((m) => m && Number(m[1]) < REVEAL_BASE).slice(0, 40);
   const ids = [...new Set(want.filter((m) => m[2] !== "V").map((m) => m[1]))];
   const vids = [...new Set(want.filter((m) => m[2] === "V").map((m) => m[1]))].slice(0, 15);
   const got = {}, gotV = {};
@@ -161,6 +163,7 @@ async function productImage(id, size, ctx) {
 async function cardData(url, ctx) {
   const id = url.searchParams.get("id") || "";
   if (!/^\d{1,9}$/.test(id)) return json({ error: "Bad id." }, 400);
+  if (Number(id) >= REVEAL_BASE) return json({ id: Number(id), series: [], sales: [], ok: false, reveal: true }, 200, { "Cache-Control": "public, max-age=3600" });
   const range = ({ month: "month", quarter: "quarter", annual: "annual" })[url.searchParams.get("r")] || "quarter";
   const noSales = url.searchParams.get("sales") === "0";
   const cache = caches.default, key = new Request(`https://cache.breakcheck/card3/${id}/${range}${noSales ? "/h" : ""}`);
@@ -493,6 +496,7 @@ async function route(req, env, ctx) {
     if (pm) return psaImage(pm[1], env, ctx);
 
     let im = path.match(/^\/img\/(\d{1,9})\/(s|m|l)$/);
+    if (im && Number(im[1]) >= REVEAL_BASE) return new Response("Not found", { status: 404, headers: { "Cache-Control": "public, max-age=86400" } });
     if (im) return productImage(im[1], im[2], ctx);
 
     if (path === "/api/share" && req.method === "POST") return createShare(req, env);

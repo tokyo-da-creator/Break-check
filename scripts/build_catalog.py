@@ -165,6 +165,9 @@ def add_cardos():
             n += 1
     print("cardos: synced", len(by_set), "sets", n, "cards in", page, "requests")
 add_cardos()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from reveals import add_reveals
+add_reveals(sets, items)
 out={"builtAt":published,"sets":sets,"items":items,"cn":cn_map}
 if len(items) < 70000 or len(sets) < 600:
     sys.exit(f"Catalog looks incomplete ({len(items)} items, {len(sets)} sets); not publishing.")
