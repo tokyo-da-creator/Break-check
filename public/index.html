@@ -932,7 +932,10 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       <div class="hint" id="psaCertHint">The number on the slab label, under the grade. Looking it up fills in the card and its PSA photo.</div>
     </div>
     <div class="step">
-      <div class="stephead"><span class="num">2</span>The card</div>
+      <div class="stephead"><span class="num">2</span><label for="psaSearch">The card</label></div>
+      <input id="psaSearch" class="search" type="search" autocomplete="off" placeholder="Find it for the card picture, e.g. luffy p-099" role="combobox" aria-expanded="false" aria-controls="psaResults">
+      <ul class="results" id="psaResults" role="listbox" hidden></ul>
+      <div class="hint" id="psaPickHint">Pick it here and its picture goes in the slab. Not listed? Add a photo of your slab instead.</div>
       <div class="field"><label for="psaName">Card</label><input id="psaName" type="text" maxlength="90" placeholder="e.g. Monkey D. Luffy" class="txt"></div>
       <div class="field"><label for="psaSet">Year and set</label><input id="psaSet" type="text" maxlength="90" placeholder="e.g. 2026 One Piece JP" class="txt"></div>
       <div class="field"><label for="psaVariety">Variety or edition (optional)</label><input id="psaVariety" type="text" maxlength="90" placeholder="e.g. PCC Nike Collab Edition" class="txt"></div>
@@ -941,8 +944,9 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="field"><label for="psaGrade">Grade</label><select id="psaGrade" class="sel"></select></div>
       </div>
       <div class="field"><label for="psaPop">PSA population at this grade (optional)</label><input id="psaPop" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 37"></div>
+      <div class="hint">For the real slab on your card, like the example: take or pick a photo of it. Looking up the cert does this automatically once PSA lookup is on.</div>
       <div class="row-photo">
-        <button class="btn sm" id="psaPhotoBtn" type="button">Use my own slab photo</button>
+        <button class="btn sm primary" id="psaPhotoBtn" type="button">📷 Add a photo of the slab</button>
         <button class="linkbtn" id="psaPhotoClear" type="button" hidden>Remove photo</button>
         <input type="file" id="psaPhotoFile" accept="image/*" hidden>
       </div>
@@ -1323,7 +1327,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791566552';
+(function(){ var BUILD='1791566798';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -1553,7 +1557,7 @@ function productArt(id, sealed){
     const src = e.img;
     src.onload = ()=>{
       if(sealed){ try{ e.img = trimToProduct(src); }catch(err){} }
-      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon(); if(!$('panel-tier').hidden) drawTierSoon();
+      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon(); if(!$('panel-tier').hidden) drawTierSoon(); if(!$('panel-psa').hidden) updatePsa();
     };
     const fail = ()=>{ if(e.failed) return; e.failed = true; if(!$('panel-show').hidden) updateShow(); };
     src.onerror = fail;
@@ -4602,7 +4606,7 @@ $('shareReceipt').addEventListener('click',()=>{
 // ---------- PSA sales: a sale card for X, plus the Recent PSA sales feed ----------
 const PSA_GRADES = [['10','GEM MT 10'],['9','MINT 9'],['8','NM-MT 8'],['7','NM 7'],['6','EX-MT 6'],['5','EX 5'],['4','VG-EX 4'],['3','VG 3'],['2','GOOD 2'],['1.5','FR 1.5'],['1','PR 1'],['A','AUTHENTIC']];
 const PSA_WHERE = ['eBay', 'Whatnot', 'Fanatics Collect', 'Goldin', 'Courtyard', 'Card show', 'In person'];
-const psa = Object.assign({cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date:'', where:'eBay', feed:true, verified:false, front:null}, store.get('psa1') || {});
+const psa = Object.assign({cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date:'', where:'eBay', feed:true, verified:false, front:null, cardId:null}, store.get('psa1') || {});
 let psaPhoto = null; const psaPhotoImg = new Image(); psaPhotoImg.onload = ()=>updatePsa();
 const psaFrontImg = new Image(); psaFrontImg.onload = ()=>updatePsa(); psaFrontImg.onerror = ()=>{ psa.front = null; updatePsa(); };
 let psaFeedLoaded = false, tPsa = 0;
@@ -4655,7 +4659,8 @@ $('psaPhotoFile').addEventListener('change', async ()=>{
 });
 $('psaPhotoClear').addEventListener('click', ()=>{ psaPhoto = null; psaPhotoImg.removeAttribute('src'); $('psaPhotoClear').hidden = true; updatePsa(); });
 $('clearPsa').addEventListener('click', ()=>{
-  Object.assign(psa, {cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date: todayISO(), where:'eBay', verified:false, front:null});
+  Object.assign(psa, {cert:'', name:'', set:'', variety:'', num:'', grade:'10', pop:'', price:'', date: todayISO(), where:'eBay', verified:false, front:null, cardId:null});
+  $('psaPickHint').textContent = 'Pick it here and its picture goes in the slab. Not listed? Add a photo of your slab instead.';
   psaPhoto = null; psaPhotoImg.removeAttribute('src'); $('psaPhotoClear').hidden = true; loadPsaFront();
   $('psaCertHint').textContent = 'The number on the slab label, under the grade. Looking it up fills in the card and its PSA photo.';
   paintPsaInputs(); savePsaState(); updatePsa();
@@ -4663,10 +4668,24 @@ $('clearPsa').addEventListener('click', ()=>{
 const psaGradeText = v => (PSA_GRADES.find(g=>g[0] === v) || PSA_GRADES[0])[1];
 function psaTitle(){ return [psa.name, psa.variety ? '('+psa.variety+')' : ''].filter(Boolean).join(' '); }
 function psaSoldLabel(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||'')) return ''; return new Date(iso+'T00:00:00Z').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}); }
+makeSearch($('psaSearch'), $('psaResults'), 'card', pickPsaCard);
+function pickPsaCard(it){
+  psa.cardId = it.id;
+  const base = (it.name||'').replace(/\s*\(.*\)\s*$/, '');
+  if(!psa.name.trim()) psa.name = base || it.name;
+  if(!psa.set.trim()) psa.set = (it.set||'').replace(/^[A-Z0-9-]+:\s*/, '');
+  if(!psa.num.trim() && it.number) psa.num = String(it.number).split('/')[0];
+  const ed = (it.name||'').match(/\(([^)]+)\)\s*$/); if(!psa.variety.trim() && ed) psa.variety = ed[1];
+  $('psaSearch').value = ''; $('psaResults').hidden = true;
+  $('psaPickHint').textContent = '✓ Using the picture of '+it.name+(it.number ? ' '+it.number : '')+'. A slab photo or PSA lookup replaces it.';
+  productArt(it.id, false); paintPsaInputs(); savePsaState(); updatePsa();
+}
 function psaArt(){
   if(psaPhoto && psaPhotoImg.complete && psaPhotoImg.naturalWidth) return {img: psaPhotoImg, photo: true};
   if(psa.front && psaFrontImg.complete && psaFrontImg.naturalWidth) return {img: psaFrontImg, photo: false};
   return null;
+}
+function psaCardArt(){ return psa.cardId ? productArt(psa.cardId, false) : null;
 }
 function psaReady(){ return psa.name.trim() && num(psa.price) > 0; }
 function psaMoney(v){ return money(v, v >= 1000 || Math.abs(v - Math.round(v)) < 0.005 ? 0 : 2); }
@@ -4689,8 +4708,12 @@ function drawSlab(ctx, x, y, w, h, rnd){
   ctx.textAlign = 'left'; if(psa.cert){ ctx.fillText('#'+psa.cert, lx + lw*0.05, ly + lh*0.88); } ctx.textAlign = 'left';
   const cx = lx + p*0.3, cy = ly + lh + p*0.8, cw = lw - p*0.6, ch = y + h - p - cy;
   rrect(ctx, cx, cy, cw, ch, 14); ctx.fillStyle = '#060806'; ctx.fill(); ctx.save(); rrect(ctx, cx, cy, cw, ch, 14); ctx.clip();
-  const m = moodImg('fire'); if(m){ const k = Math.max(cw/m.naturalWidth, ch/m.naturalHeight)*1.05; ctx.drawImage(m, cx + (cw - m.naturalWidth*k)/2, cy + (ch - m.naturalHeight*k)/2, m.naturalWidth*k, m.naturalHeight*k); }
-  else { ctx.font = '400 '+Math.round(cw*0.2)+'px Anton'; ctx.fillStyle = 'rgba(163,230,53,.25)'; ctx.textAlign = 'center'; ctx.fillText('PSA '+gv, cx + cw/2, cy + ch/2); ctx.textAlign = 'left'; }
+  const ca = psaCardArt();
+  if(ca){ const im = ca.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min((cw*0.9)/iw, (ch*0.94)/ih), w2 = iw*k, h2 = ih*k, x2 = cx + (cw - w2)/2, y2 = cy + (ch - h2)/2;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; rrect(ctx, x2, y2, w2, h2, w2*0.045); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    ctx.save(); rrect(ctx, x2, y2, w2, h2, w2*0.045); ctx.clip(); ctx.drawImage(im, x2, y2, w2, h2); ctx.restore(); }
+  else { const m = moodImg('fire'); if(m){ const k = Math.max(cw/m.naturalWidth, ch/m.naturalHeight)*1.05; ctx.drawImage(m, cx + (cw - m.naturalWidth*k)/2, cy + (ch - m.naturalHeight*k)/2, m.naturalWidth*k, m.naturalHeight*k); }
+  else { ctx.font = '400 '+Math.round(cw*0.2)+'px Anton'; ctx.fillStyle = 'rgba(163,230,53,.25)'; ctx.textAlign = 'center'; ctx.fillText('PSA '+gv, cx + cw/2, cy + ch/2); ctx.textAlign = 'left'; } }
   const shine = ctx.createLinearGradient(cx, cy, cx + cw, cy + ch); shine.addColorStop(.3, 'rgba(255,255,255,0)'); shine.addColorStop(.48, 'rgba(255,255,255,.12)'); shine.addColorStop(.56, 'rgba(255,255,255,0)'); ctx.fillStyle = shine; ctx.fillRect(cx, cy, cw, ch);
   ctx.restore();
 }
