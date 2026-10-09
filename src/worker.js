@@ -277,7 +277,7 @@ function sharePage(origin, id, meta) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0B0B0C">
+<meta name="theme-color" content="#030303">
 <link rel="icon" href="/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>${t} · Break Check</title>
@@ -298,7 +298,7 @@ function sharePage(origin, id, meta) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;800&display=swap">
 <style>
-:root{--bg:#0B0B0C;--fg:#F4F1EA;--muted:#A3A09A;--line:#2C2C30;--win:#C6FF3D;--loss:#FF4D2E;--ink:#0B0B0C;color-scheme:dark}
+:root{--bg:#030303;--fg:#F4F4F5;--muted:#A1A1AA;--line:#262626;--win:#A3E635;--loss:#F0435A;--ink:#030303;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font-family:'Archivo','Helvetica Neue',Helvetica,sans-serif;padding-inline:16px;padding-block:20px 48px}
@@ -306,15 +306,15 @@ body{background:var(--bg);color:var(--fg);font-family:'Archivo','Helvetica Neue'
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--fg)}
 .brand img{width:40px;height:40px;object-fit:contain}
 .mark{font-family:'Anton','Impact',sans-serif;font-size:32px;letter-spacing:.04em;line-height:1}
-.mark span{color:var(--loss)}
-.card{width:100%;max-width:100%;aspect-ratio:${ratio};display:block;border-radius:14px;border:1px solid var(--line);background:#151517}
+.mark span{color:var(--win)}
+.card{width:100%;max-width:100%;aspect-ratio:${ratio};display:block;border-radius:14px;border:1px solid var(--line);background:#0B0B0B}
 h1{font-size:22px;line-height:1.25;margin:0;text-wrap:balance}
 p{margin:0;color:var(--muted);line-height:1.5}
-.cta{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:12px;background:var(--fg);color:var(--ink);font-weight:800;font-size:17px;text-decoration:none}
+.cta{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:12px;background:var(--win);color:#0C1204;box-shadow:0 8px 28px -12px rgba(163,230,53,.7);font-weight:800;font-size:17px;text-decoration:none}
 .cta:focus-visible{outline:2px solid var(--win);outline-offset:3px}
 .small{font-size:13px;color:var(--muted)}
 .bd{display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--line);padding-top:16px}
-.bd h2{margin:0;font:700 13px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.bd h2{margin:0;font:700 13px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--win)}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 td{padding:10px 0;border-bottom:1px solid var(--line);vertical-align:top}
@@ -322,7 +322,7 @@ td{padding:10px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .id{font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 .iv{text-align:right;font:700 15px ui-monospace,Menlo,monospace;white-space:nowrap;padding-left:12px;color:var(--win)}
 .ok{font:11px ui-monospace,Menlo,monospace;color:var(--win)}
-.self{font:11px ui-monospace,Menlo,monospace;color:#FFB020}
+.self{font:11px ui-monospace,Menlo,monospace;color:#E0A43A}
 </style>
 </head>
 <body>
