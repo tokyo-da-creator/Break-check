@@ -304,7 +304,7 @@ header.top .tabs{margin-top:18px}
   header.top .kicker{display:none}
   header.top .mascot{--m:48px}
   header.top .mark{font-size:28px}
-  header.top .tabs{grid-template-columns:repeat(4,1fr);margin:0;justify-self:center;width:100%;max-width:560px;grid-column:3;grid-row:1}
+  header.top .tabs{grid-template-columns:repeat(5,1fr);margin:0;justify-self:center;width:100%;max-width:680px;grid-column:3;grid-row:1}
   header.top .brand{grid-column:1;grid-row:1}
   header.top .games{margin:0;grid-column:2;grid-row:1}
   header.top .games button{flex:none;min-height:34px;font-size:13px}
@@ -336,6 +336,36 @@ header.top .tabs{margin-top:18px}
   .btn:hover{border-color:color-mix(in srgb,var(--fg) 40%,var(--line))}
 }
 .results li.more{display:flex;justify-content:center;padding:12px;border-bottom:0}
+/* tier list editor */
+.tabs button:last-child:nth-child(odd){grid-column:1/-1}
+@media (min-width:1024px){header.top .tabs button:last-child:nth-child(odd){grid-column:auto}}
+.tboard{display:flex;flex-direction:column;gap:8px}
+.trow{display:grid;grid-template-columns:72px minmax(0,1fr);border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));border-radius:12px;overflow:hidden;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 14%,transparent),transparent 60%),var(--surface);min-height:84px}
+.trow.drop{outline:2px solid var(--c);outline-offset:-2px}
+.tlab{background:var(--c);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;position:relative}
+.tlab input[type=text]{background:transparent;border:0;padding:0;min-height:0;width:100%;text-align:center;font:400 28px Anton,var(--body);color:var(--labc,#0B0B0C)}
+.tcol{position:relative;width:26px;height:26px;border-radius:50%;background:conic-gradient(#FF4D6D,#FFC83D,#C6FF3D,#3DC8FF,#9A7CFF,#FF4D6D);border:2px solid var(--labc,#0B0B0C);cursor:pointer;flex:none}
+.tcol input{position:absolute;inset:0;opacity:0;width:100%;height:100%;min-height:0;padding:0;border:0;cursor:pointer}
+.tlab .tdel{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.25);color:var(--labc,#0B0B0C);font:700 13px var(--body);cursor:pointer;line-height:1}
+.tcards{display:flex;flex-wrap:wrap;gap:6px;padding:8px;align-content:flex-start;cursor:pointer}
+.tcards .empty{font:600 12px var(--mono);color:var(--muted);letter-spacing:.1em;align-self:center;padding:0 6px}
+.tcard{border:0;padding:0;background:none;border-radius:5px;cursor:grab;position:relative;outline-offset:2px}
+.tcard .thumb{width:48px;height:67px;border-radius:4px}
+.tcard[aria-pressed="true"]{outline:3px solid var(--win)}
+.tpool{border:1px dashed var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.tpool .tcards{padding:0}
+.tbar{position:sticky;bottom:10px;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--ink) 92%,transparent);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.tbar b{font:600 13px var(--body);color:var(--muted);margin-right:4px;flex-basis:100%}
+.tbar button{min-width:44px;min-height:44px;border-radius:10px;border:0;font:400 20px Anton,var(--body);cursor:pointer;background:var(--c,var(--raise));color:var(--labc,var(--fg));padding:0 10px}
+.tbar button.txt{font:700 14px var(--body);background:var(--raise);color:var(--fg)}
+.tbar button.rm{background:transparent;border:1px solid var(--loss);color:var(--loss);font:700 14px var(--body)}
+.results li.added{opacity:.55}
+.results .addb{font:800 20px var(--body);color:var(--win);width:36px;text-align:center}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.swatches button{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.swatches button[aria-pressed="true"]{border-color:var(--fg);box-shadow:0 0 0 2px var(--ink) inset}
+.swatches input[type=color]{width:38px;height:38px;min-height:0;padding:0;border-radius:50%;border:2px dashed var(--line);background:none;cursor:pointer}
+input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;background:none}
 /* top lists */
 .toplists .chip[aria-pressed="true"]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
 .toprows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
@@ -422,6 +452,7 @@ header.top .tabs{margin-top:18px}
       <button id="tab-log" role="tab" aria-selected="false" aria-controls="panel-log">Log my pulls</button>
       <button id="tab-show" role="tab" aria-selected="false" aria-controls="panel-show">Show a card</button>
       <button id="tab-top" role="tab" aria-selected="false" aria-controls="panel-top">Top lists</button>
+      <button id="tab-tier" role="tab" aria-selected="false" aria-controls="panel-tier">Tier list</button>
     </div>
   </header>
   <div class="lede"><h1>Know what it’s worth before you buy.</h1><div class="live lede-live"><i aria-hidden="true"></i><span id="priceAge2">Live TCGplayer prices</span></div><p id="ledeText">Live market prices for every English and Japanese card, box, ETB and pack, plus Chinese singles.</p></div>
@@ -650,6 +681,61 @@ header.top .tabs{margin-top:18px}
     <div class="preview" id="topPreview" hidden>
       <div class="eyebrow">Top list<span class="touch-only"> · press and hold to save</span></div>
       <div class="holo" id="topHolo"><img id="topImg" alt="Top list share image"></div>
+    </div>
+   </div>
+  </section>
+
+  <!-- TIER LIST -->
+  <section class="panel" id="panel-tier" role="tabpanel" aria-labelledby="tab-tier" hidden>
+   <div class="col-in">
+    <div class="step">
+      <div class="stephead"><span class="num">1</span><label for="tierTitle">Name it</label></div>
+      <input id="tierTitle" type="text" maxlength="60" placeholder="My Ultimate Pikachu Tier List" style="font-family:var(--body);font-weight:700">
+      <input id="tierSub" type="text" maxlength="90" placeholder="Subtitle (optional), e.g. Full arts and up, English only" style="font-family:var(--body);font-size:15px">
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">2</span><label for="tierSearch">Add cards</label></div>
+      <input id="tierSearch" class="search" type="search" autocomplete="off" placeholder="Any card, e.g. pikachu, moonbreon, charizard 199">
+      <ul class="results" id="tierResults" hidden></ul>
+      <div class="hint">Tap a card to add it. Or add every card of one Pokémon at once:</div>
+      <div class="seg slim" id="tierEra" role="group" aria-label="Era" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-v="all" aria-pressed="false">All eras</button><button type="button" data-v="swsh" aria-pressed="true">Sword &amp; Shield+</button><button type="button" data-v="sv" aria-pressed="false">Scarlet &amp; Violet+</button></div>
+      <div class="seg slim" id="tierRar" role="group" aria-label="Rarity"><button type="button" data-v="fa" aria-pressed="true">Full arts &amp; up</button><button type="button" data-v="all" aria-pressed="false">Every rarity</button></div>
+      <div class="seg slim" id="tierLang" role="group" aria-label="Language" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-v="en" aria-pressed="true">English</button><button type="button" data-v="jp" aria-pressed="false">Japanese</button><button type="button" data-v="all" aria-pressed="false">Both</button></div>
+      <button class="btn" id="tierFill" type="button" disabled>Add every card of a Pokémon</button>
+      <div class="status" id="tierFillStatus"></div>
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">3</span>Rank them</div>
+      <div class="hint">Tap a card, then pick its tier. On a computer you can drag.</div>
+      <div class="tboard" id="tierBoard"></div>
+      <div class="tpool" id="tierPoolBox"><div class="eyebrow" id="tierPoolHead">Unranked</div><div class="tcards" id="tierPool" data-t="pool"></div></div>
+      <div class="tbar" id="tierBar" hidden></div>
+      <div class="chips" id="tierPresets" role="group" aria-label="Tier colours"></div>
+      <div class="btns"><button class="btn" id="tierAdd" type="button">+ Add a tier</button><button class="btn" id="tierReset" type="button">Unrank all</button><button class="btn" id="tierClear" type="button">Start over</button></div>
+    </div>
+    <div class="step">
+      <div class="stephead"><span class="num">4</span>Style</div>
+      <div class="seg" id="tierPrices" role="group" aria-label="Prices"><button type="button" data-v="1" aria-pressed="true">Show prices</button><button type="button" data-v="0" aria-pressed="false">No prices</button></div>
+      <div class="seg" id="tierWm" role="group" aria-label="Watermark"><button type="button" data-v="1" aria-pressed="true">Watermark on</button><button type="button" data-v="0" aria-pressed="false">Watermark off</button></div>
+      <div id="tierWmOpts" style="display:flex;flex-direction:column;gap:10px">
+        <div class="field"><label>Watermark colour</label><div class="swatches" id="tierWmCols"></div></div>
+        <div class="field"><label for="tierWmOp">Watermark strength</label><input id="tierWmOp" type="range" min="6" max="36" step="1" value="16"></div>
+        <div class="hint">Uses your @handle. Add your X username below the image.</div>
+      </div>
+    </div>
+   </div>
+   <div class="col-out">
+    <div class="result" aria-live="polite">
+      <div class="empty-state" id="tierEmpty">Add some cards and rank them. Your tier list image shows up here.</div>
+      <div id="tierOut" style="display:flex;flex-direction:column;gap:12px" hidden>
+        <div class="creator" data-creator></div>
+        <div class="btns"><button class="btn primary" id="saveTier">Save image</button><button class="btn" id="copyTier">Copy caption</button></div>
+      </div>
+      <div class="status" id="statusTier"></div>
+    </div>
+    <div class="preview" id="tierPreview" hidden>
+      <div class="eyebrow">Tier list<span class="touch-only"> · press and hold to save</span></div>
+      <div class="holo"><img id="tierImg" alt="Tier list share image"></div>
     </div>
    </div>
   </section>
@@ -974,7 +1060,7 @@ function productArt(id, sealed){
     const src = e.img;
     src.onload = ()=>{
       if(sealed){ try{ e.img = trimToProduct(src); }catch(err){} }
-      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon();
+      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon(); if(!$('panel-tier').hidden) drawTierSoon();
     };
     const fail = ()=>{ if(e.failed) return; e.failed = true; if(!$('panel-show').hidden) updateShow(); };
     src.onerror = fail;
@@ -2617,7 +2703,7 @@ async function squareAvatar(blob){
 function setCreator(c){
   creator = c; store.set('creator', c);
   if(c && c.img){ if(creatorImg.src !== c.img) creatorImg.src = c.img; }
-  paintCreator(); updateCheck(); updateLog(); updateShow();
+  paintCreator(); updateCheck(); updateLog(); updateShow(); if(!$('panel-tier').hidden) drawTierSoon();
 }
 function paintCreator(){
   document.querySelectorAll('[data-creator]').forEach(box=>{
@@ -3376,7 +3462,7 @@ function drawTierList(T){
   const H0 = 210, rgap = 10, foot = 120, H = H0 + tiers.reduce((s, t)=>s + t.h + rgap, 0) + foot;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   ctx.fillStyle = '#060608'; ctx.fillRect(0, 0, W, H);
-  const sp = ctx.createRadialGradient(W*0.3, 40, 10, W*0.3, 40, 700); sp.addColorStop(0, hexA(LIME, .16)); sp.addColorStop(1, hexA(LIME, 0)); ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H0 + 200);
+  const sp = ctx.createRadialGradient(W*0.3, 40, 10, W*0.3, 40, 700); sp.addColorStop(0, hexA(LIME, .16)); sp.addColorStop(1, hexA(LIME, 0)); ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H);
   // header: your avatar big, title, @handle
   const av = 132, ax0 = gx, ay0 = 36, has = creatorOn() && creatorImg.complete && creatorImg.naturalWidth;
   ctx.save(); ctx.beginPath(); ctx.arc(ax0 + av/2, ay0 + av/2, av/2 + 5, 0, Math.PI*2); ctx.fillStyle = LIME; ctx.shadowColor = hexA(LIME, .55); ctx.shadowBlur = 30; ctx.fill(); ctx.restore();
@@ -3438,7 +3524,165 @@ function drawTierList(T){
   grainVignette(ctx, rnd, .02, .4);
   return cv;
 }
-window.__drawTierList = drawTierList;   // preview hook (temporary)
+// ---------- tier list editor ----------
+const TIER_PRESETS = {
+  Rainbow: ['#FF4D6D', '#FF8A3D', '#FFC83D', '#C6FF3D', '#3BE38A', '#3DC8FF', '#9A7CFF'],
+  Gold: ['#E8B931', '#D99A2B', '#B98A4A', '#8C8F99', '#5E6470', '#3B3F48', '#2A2D33'],
+  Lime: ['#C6FF3D', '#A6E23A', '#86C536', '#67A733', '#4A8A2F', '#2F6C2A', '#1E4F22'],
+  Ice: ['#E8F6FF', '#B8E4FF', '#86CFFF', '#58B6F5', '#3A93D6', '#2A6FA8', '#1D4E7A'],
+  Ember: ['#FF3D3D', '#FF6A2B', '#FF9A2B', '#FFC24A', '#B9A27A', '#7D7468', '#4A4743']
+};
+const WM_COLS = ['#C6FF3D', '#F4F1EA', '#E8B931', '#FF4D6D', '#3DC8FF', '#9A7CFF', '#0B0B0C'];
+const tierNew = () => ({title: '', sub: '', prices: true, wm: {on: true, color: '#C6FF3D', op: 16}, preset: 'Rainbow',
+  tiers: ['S', 'A', 'B', 'C', 'D', 'F'].map((l, i)=>({label: l, color: TIER_PRESETS.Rainbow[i], keys: []})), pool: [], items: {}});
+let tier = store.get('tier1') || tierNew(), tierSel = null, tTier, tTierSearch;
+const tKey = x => x.id+'|'+(x.variant||'');
+const tLab = c => { const n = parseInt(c.slice(1), 16); return (0.299*(n>>16) + 0.587*((n>>8)&255) + 0.114*(n&255))/255 > .55 ? '#0B0B0C' : '#F4F1EA'; };
+function saveTier(){ store.set('tier1', tier); }
+function tierPlace(k){ if(tier.pool.includes(k)) return 'pool'; const i = tier.tiers.findIndex(t=>t.keys.includes(k)); return i; }
+function tierRemoveKey(k){ tier.pool = tier.pool.filter(x=>x!==k); tier.tiers.forEach(t=>{ t.keys = t.keys.filter(x=>x!==k); }); }
+function tierMove(k, to){ tierRemoveKey(k); if(to === 'pool') tier.pool.push(k); else if(to === 'del') delete tier.items[k]; else tier.tiers[to].keys.push(k); }
+function tierAddItem(x){
+  const k = tKey(x); if(tier.items[k]) return false;
+  tier.items[k] = {id: x.id, name: x.name, number: x.number, set: x.set, variant: x.variant, rarity: x.rarity, best: x.best, jp: x.jp};
+  tier.pool.push(k); return true;
+}
+function tierCard(k){
+  const x = tier.items[k], b = document.createElement('button'); b.type = 'button'; b.className = 'tcard'; b.draggable = true; b.dataset.k = k;
+  b.setAttribute('aria-pressed', tierSel === k); b.title = x.name+(x.number ? ' '+x.number : '')+(x.best != null ? ' · '+topMoney(x.best) : '');
+  b.append(thumb(x.id, false));
+  b.addEventListener('click', e=>{ e.stopPropagation(); tierSel = tierSel === k ? null : k; paintTierBoard(); });
+  b.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', k); e.dataTransfer.effectAllowed = 'move'; });
+  return b;
+}
+function tierDropZone(el, to){
+  el.addEventListener('click', ()=>{ if(tierSel){ tierMove(tierSel, to); tierSel = null; tierChanged(); } });
+  el.addEventListener('dragover', e=>{ e.preventDefault(); el.closest('.trow,.tpool').classList.add('drop'); });
+  el.addEventListener('dragleave', ()=>el.closest('.trow,.tpool').classList.remove('drop'));
+  el.addEventListener('drop', e=>{ e.preventDefault(); el.closest('.trow,.tpool').classList.remove('drop'); const k = e.dataTransfer.getData('text/plain'); if(k && tier.items[k]){ tierMove(k, to); tierSel = null; tierChanged(); } });
+}
+function paintTierBoard(){
+  const bd = $('tierBoard'); bd.textContent = '';
+  tier.tiers.forEach((t, i)=>{
+    const row = document.createElement('div'); row.className = 'trow'; row.style.setProperty('--c', t.color); row.style.setProperty('--labc', tLab(t.color));
+    const lab = document.createElement('div'); lab.className = 'tlab';
+    const li = document.createElement('input'); li.type = 'text'; li.value = t.label; li.maxLength = 10; li.setAttribute('aria-label', 'Tier name');
+    li.addEventListener('input', ()=>{ t.label = li.value || ' '; saveTier(); drawTierSoon(); paintTierBar(); });
+    const ci = document.createElement('input'); ci.type = 'color'; ci.value = t.color; ci.setAttribute('aria-label', 'Tier colour');
+    ci.addEventListener('input', ()=>{ t.color = ci.value; tier.preset = ''; row.style.setProperty('--c', t.color); row.style.setProperty('--labc', tLab(t.color)); saveTier(); drawTierSoon(); paintTierPresets(); });
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'tdel'; del.textContent = '×'; del.setAttribute('aria-label', 'Remove tier '+t.label);
+    del.addEventListener('click', ()=>{ tier.pool.push(...t.keys); tier.tiers.splice(i, 1); tierChanged(); });
+    const cw = document.createElement('label'); cw.className = 'tcol'; cw.title = 'Tier colour'; cw.append(ci);
+    lab.append(li, cw); if(tier.tiers.length > 1) lab.append(del);
+    const cards = document.createElement('div'); cards.className = 'tcards';
+    t.keys.forEach(k=>cards.append(tierCard(k)));
+    if(!t.keys.length){ const e = document.createElement('span'); e.className = 'empty'; e.textContent = tierSel ? 'TAP TO PUT IT HERE' : 'EMPTY'; cards.append(e); }
+    tierDropZone(cards, i);
+    row.append(lab, cards); bd.append(row);
+  });
+  const pool = $('tierPool'); pool.textContent = '';
+  tier.pool.forEach(k=>pool.append(tierCard(k)));
+  if(!tier.pool.length){ const e = document.createElement('span'); e.className = 'empty'; e.textContent = Object.keys(tier.items).length ? 'ALL RANKED' : 'ADD CARDS ABOVE'; pool.append(e); }
+  if(!pool.dataset.wired){ pool.dataset.wired = 1; tierDropZone(pool, 'pool'); }
+  $('tierPoolHead').textContent = 'Unranked'+(tier.pool.length ? ' · '+tier.pool.length : '');
+  paintTierBar();
+}
+function paintTierBar(){
+  const bar = $('tierBar'); bar.textContent = ''; bar.hidden = !tierSel || !tier.items[tierSel];
+  if(bar.hidden) return;
+  const x = tier.items[tierSel], b0 = document.createElement('b'); b0.textContent = x.name+(x.best != null ? ' · '+topMoney(x.best) : '')+' → move to'; bar.append(b0);
+  tier.tiers.forEach((t, i)=>{ const b = document.createElement('button'); b.type = 'button'; b.textContent = t.label; b.style.setProperty('--c', t.color); b.style.setProperty('--labc', tLab(t.color));
+    b.addEventListener('click', ()=>{ tierMove(tierSel, i); tierSel = null; tierChanged(); }); bar.append(b); });
+  const un = document.createElement('button'); un.type = 'button'; un.className = 'txt'; un.textContent = 'Unranked'; un.addEventListener('click', ()=>{ tierMove(tierSel, 'pool'); tierSel = null; tierChanged(); });
+  const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm'; rm.textContent = 'Remove'; rm.addEventListener('click', ()=>{ tierMove(tierSel, 'del'); tierSel = null; tierChanged(); });
+  bar.append(un, rm);
+}
+function paintTierPresets(){
+  const box = $('tierPresets'); box.textContent = '';
+  Object.keys(TIER_PRESETS).forEach(n=>{ const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('aria-pressed', tier.preset === n);
+    const sw = document.createElement('span'); sw.style.cssText = 'display:inline-flex;gap:2px'; TIER_PRESETS[n].slice(0, 5).forEach(c=>{ const d = document.createElement('i'); d.style.cssText = 'width:10px;height:10px;border-radius:50%;display:inline-block;background:'+c; sw.append(d); });
+    b.append(sw, document.createTextNode(n));
+    b.addEventListener('click', ()=>{ tier.preset = n; tier.tiers.forEach((t, i)=>{ t.color = TIER_PRESETS[n][i % TIER_PRESETS[n].length]; }); tierChanged(); });
+    box.append(b); });
+}
+function paintTierStyle(){
+  document.querySelectorAll('#tierPrices button').forEach(b=>b.setAttribute('aria-pressed', (b.dataset.v === '1') === tier.prices));
+  document.querySelectorAll('#tierWm button').forEach(b=>b.setAttribute('aria-pressed', (b.dataset.v === '1') === tier.wm.on));
+  $('tierWmOpts').style.display = tier.wm.on ? 'flex' : 'none'; $('tierWmOp').value = tier.wm.op;
+  const sw = $('tierWmCols'); sw.textContent = '';
+  WM_COLS.forEach(c=>{ const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', 'Watermark colour '+c); b.setAttribute('aria-pressed', tier.wm.color.toLowerCase() === c.toLowerCase());
+    b.addEventListener('click', ()=>{ tier.wm.color = c; saveTier(); paintTierStyle(); drawTierSoon(); }); sw.append(b); });
+  const ci = document.createElement('input'); ci.type = 'color'; ci.value = tier.wm.color; ci.setAttribute('aria-label', 'Pick any watermark colour');
+  ci.addEventListener('input', ()=>{ tier.wm.color = ci.value; saveTier(); drawTierSoon(); }); ci.addEventListener('change', paintTierStyle); sw.append(ci);
+  $('tierTitle').value = tier.title; $('tierSub').value = tier.sub;
+}
+function tierChanged(){ saveTier(); paintTierBoard(); paintTierPresets(); drawTierSoon(); }
+function tierTitleText(){ return tier.title.trim() || (creatorOn() ? creator.handle+'’s Tier List' : 'My Tier List'); }
+function tierState(){
+  return {title: tierTitleText(), sub: tier.sub.trim(), prices: tier.prices,
+    tiers: tier.tiers.map(t=>({label: t.label.trim() || '?', color: t.color, items: t.keys.map(k=>tier.items[k]).filter(Boolean)})),
+    watermark: {on: tier.wm.on, color: tier.wm.color, opacity: tier.wm.op/100}};
+}
+function drawTierSoon(){
+  clearTimeout(tTier);
+  tTier = setTimeout(()=>{
+    const has = tier.tiers.some(t=>t.keys.length);
+    $('tierEmpty').hidden = has; $('tierOut').hidden = !has; $('tierPreview').hidden = !has;
+    if(!has) return; const cv = drawTierList(tierState()); if(cv) $('tierImg').src = cv.toDataURL('image/jpeg', 0.9);
+  }, 220);
+}
+function openTier(){ paintTierStyle(); paintTierPresets(); paintTierBoard(); drawTierSoon(); }
+// search: tap a result to add it
+async function tierFind(){
+  const q = $('tierSearch').value.trim(), ul = $('tierResults'); $('tierFill').disabled = q.length < 2;
+  $('tierFill').textContent = q.length < 2 ? 'Add every card of a Pokémon' : 'Add every '+q.replace(/\b\w/g, c=>c.toUpperCase())+' card';
+  if(q.length < 2){ ul.hidden = true; return; }
+  try{
+    const r = await fetch('/api/search?kind=card&q='+encodeURIComponent(q)), d = await r.json(); if($('tierSearch').value.trim() !== q) return;
+    ul.textContent = '';
+    (d.results||[]).filter(x=>x.kind === 'card').slice(0, 30).forEach(x=>{
+      const li = document.createElement('li'); li.setAttribute('role', 'option'); if(tier.items[tKey(x)]) li.classList.add('added');
+      const mid = document.createElement('div'); mid.style.minWidth = '0';
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name+(x.number ? ' '+x.number : '');
+      const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : '', x.best != null ? topMoney(x.best) : ''].filter(Boolean).join(' · ');
+      mid.append(nm, sb); const ad = document.createElement('span'); ad.className = 'addb'; ad.textContent = tier.items[tKey(x)] ? '✓' : '+';
+      li.append(thumb(x.id, false), mid, ad);
+      li.addEventListener('click', ()=>{ if(tierAddItem(x)){ li.classList.add('added'); ad.textContent = '✓'; tierChanged(); } });
+      ul.append(li);
+    });
+    if(!ul.children.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = d.note || 'No cards found.'; ul.append(li); }
+    ul.hidden = false;
+  }catch(e){}
+}
+$('tierSearch').addEventListener('input', ()=>{ clearTimeout(tTierSearch); tTierSearch = setTimeout(tierFind, 180); });
+['tierEra', 'tierRar', 'tierLang'].forEach(id=>document.querySelectorAll('#'+id+' button').forEach(b=>b.addEventListener('click', ()=>{ document.querySelectorAll('#'+id+' button').forEach(o=>o.setAttribute('aria-pressed', o === b)); })));
+const segVal = id => (document.querySelector('#'+id+' button[aria-pressed="true"]') || {}).dataset.v;
+$('tierFill').addEventListener('click', async ()=>{
+  const q = $('tierSearch').value.trim(); if(q.length < 2) return;
+  const st = $('tierFillStatus'); st.textContent = 'Finding every '+q+' card…';
+  try{
+    const r = await fetch('/api/search?pool='+encodeURIComponent(q)+'&era='+segVal('tierEra')+'&rar='+segVal('tierRar')+'&lang='+segVal('tierLang')), d = await r.json();
+    let n = 0; (d.results||[]).forEach(x=>{ if(tierAddItem(x)) n++; });
+    if(!tier.title.trim() && n){ const nm = q.replace(/\b\w/g, c=>c.toUpperCase()); tier.title = (creatorOn() ? creator.handle+'’s' : 'My')+' Ultimate '+nm+' Tier List'; $('tierTitle').value = tier.title; }
+    st.textContent = n ? 'Added '+n+' cards to Unranked. Now rank them.' : (d.results||[]).length ? 'Those are already on your list.' : 'No '+q+' cards match those filters.';
+    tierChanged();
+  }catch(e){ st.textContent = 'Couldn’t load cards. Try again.'; }
+});
+$('tierTitle').addEventListener('input', ()=>{ tier.title = $('tierTitle').value; saveTier(); drawTierSoon(); });
+$('tierSub').addEventListener('input', ()=>{ tier.sub = $('tierSub').value; saveTier(); drawTierSoon(); });
+$('tierAdd').addEventListener('click', ()=>{ const n = tier.tiers.length, pal = TIER_PRESETS[tier.preset] || TIER_PRESETS.Rainbow; tier.tiers.push({label: String.fromCharCode(65 + Math.min(n, 25)), color: pal[n % pal.length], keys: []}); tierChanged(); });
+$('tierReset').addEventListener('click', ()=>{ tier.tiers.forEach(t=>{ tier.pool.push(...t.keys); t.keys = []; }); tierSel = null; tierChanged(); });
+$('tierClear').addEventListener('click', ()=>{ if(!confirm('Clear this tier list and start over?')) return; tier = tierNew(); tierSel = null; paintTierStyle(); tierChanged(); });
+document.querySelectorAll('#tierPrices button').forEach(b=>b.addEventListener('click', ()=>{ tier.prices = b.dataset.v === '1'; saveTier(); paintTierStyle(); drawTierSoon(); }));
+document.querySelectorAll('#tierWm button').forEach(b=>b.addEventListener('click', ()=>{ tier.wm.on = b.dataset.v === '1'; saveTier(); paintTierStyle(); drawTierSoon(); }));
+$('tierWmOp').addEventListener('input', ()=>{ tier.wm.op = Number($('tierWmOp').value); saveTier(); drawTierSoon(); });
+$('saveTier').addEventListener('click', ()=>{ const cv = drawTierList(tierState()); if(cv) save(cv, 'tier-list.jpg', $('statusTier'), 'image/jpeg'); });
+$('copyTier').addEventListener('click', ()=>{
+  const T = tierState(), lines = T.tiers.filter(t=>t.items.length).slice(0, 3).map(t=>t.label+': '+t.items.slice(0, 3).map(x=>topName(x)).join(', ')+(t.items.length > 3 ? ' +'+(t.items.length - 3) : ''));
+  const cap = T.title+'\n'+lines.join('\n')+'\nWhat would you change? #breakcheck pokesnipr.com';
+  const done = ()=>{ $('statusTier').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusTier').textContent = cap; };
+  try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
+});
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
   const n = topItems.length, W = 1200, gx = 40, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(n*31 + 7);
@@ -3648,19 +3892,21 @@ $('saveBreak').addEventListener('click', ()=>{
 
 // ---------- tabs ----------
 function showTab(t){
-  if(!['check','log','show','top'].includes(t)) t = 'check';
+  if(!['check','log','show','top','tier'].includes(t)) t = 'check';
   const isCheck = t==='check';
-  ['check','log','show','top'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
+  ['check','log','show','top','tier'].forEach(k=>{ $('tab-'+k).setAttribute('aria-selected', k===t); $('panel-'+k).hidden = k!==t; });
   const changed = store.get('tab') !== t;
   if(changed) replay($('panel-'+t), 'enter');
   if(t==='show') updateShow();
   if(t==='top') openTop();
+  if(t==='tier') openTier();
   store.set('tab', t);
 }
 $('tab-check').addEventListener('click',()=>showTab('check'));
 $('tab-log').addEventListener('click',()=>showTab('log'));
 $('tab-show').addEventListener('click',()=>showTab('show'));
 $('tab-top').addEventListener('click',()=>showTab('top'));
+$('tab-tier').addEventListener('click',()=>showTab('tier'));
 
 // ---------- inputs ----------
 $('pay').addEventListener('input',()=>{ markEdited('check'); updateCheck(); });

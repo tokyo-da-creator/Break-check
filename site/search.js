@@ -158,6 +158,26 @@ window.__noShare = true;
       for(var j=0;j<c.items.length;j++){ var p=c.items[j]; if(p[7]!==si2 || p[8]!=='s' || p[9]!==1 || best(p[5],p[6])==null) continue; if(/sleeved|blister|pokemon center|bundle/i.test(p[1])) continue; pk=res(c,j); break; }
       return {results:rowsT.map(function(i){ return res(c,i); }), rows:rowsT, pack:pk};
     }
+    // Tier list: every card of one Pokémon, filtered by era / rarity / language (one printing per card)
+    if(q.get('pool')!=null){
+      var pq=(q.get('pool')||'').toLowerCase().replace(/é/g,'e').trim(); if(pq.length<2) return {results:[], rows:[]};
+      var era=q.get('era'), from=era==='sv' ? '2023-03-31' : era==='swsh' ? '2020-02-07' : '', fa=q.get('rar')!=='all', pl=({en:0,jp:1})[q.get('lang')];
+      var FA=/^(ultra rare|secret rare|illustration rare|special illustration rare|hyper rare|shiny ultra rare|shiny secret rare|rainbow rare|art rare|special art rare|super rare|character rare|character super rare|trainer rare|mega hyper rare|mega ultra rare|mega attack rare|gold|rare secret|rare ultra)$/i;
+      var picked={}, rowsP=[];
+      for(var i=0;i<c.items.length;i++){
+        var e=c.items[i]; if(e[8]!=='c') continue; var st=c.sets[e[7]];
+        if(st[2]===2 || (pl!=null && st[2]!==pl)) continue;
+        var nm=e[1].toLowerCase().replace(/é/g,'e'); if(nm.indexOf(pq)!==0 || /[a-z]/.test(nm.charAt(pq.length))) continue;   // starts with the name, whole word
+        if(from && (st[1]||'')<from) continue;
+        if(fa && !FA.test(e[3]||'') && !/full art|alternate|secret|special art/i.test(e[1])) continue;
+        var k=e[0], prev=picked[k];
+        if(prev==null || (c.items[prev][4]!=='Holo' && e[4]==='Holo')) picked[k]=i;
+      }
+      for(var k2 in picked) rowsP.push(picked[k2]);
+      rowsP.sort(function(a,b){ return (best(c.items[b][5],c.items[b][6])||0)-(best(c.items[a][5],c.items[a][6])||0); });
+      rowsP=rowsP.slice(0,120);
+      return {results:rowsP.map(function(i){ return res(c,i); }), rows:rowsP, total:rowsP.length};
+    }
     if(q.get('featured')){
       var today=new Date().toISOString().slice(0,10);
       var order=c.sets.map(function(s,si){ return {s:s, si:si}; })
@@ -280,7 +300,7 @@ window.__noShare = true;
           var b=search(c, U); b.builtAt=c.builtAt;
           var rows=b.rows||[]; delete b.rows;
           // Live prices for the first 15 results (the ones you can see); the rest update when picked.
-          var picked = /[?&]ids=/.test(url), settop = /[?&]settop=/.test(url), n = picked || settop ? 40 : 15;
+          var picked = /[?&]ids=/.test(url), settop = /[?&]settop=/.test(url), n = picked || settop || /[?&]pool=/.test(url) ? 40 : 15;
           // Top cards in a set: add each card's price 30 days ago (from the movers file) so the image can show the move
           var mv = settop ? movers().then(function(m){
             var at={}; (m.rows||[]).forEach(function(r){ at[r[0]+'|'+r[1]]=r; });
