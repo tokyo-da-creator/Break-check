@@ -404,13 +404,13 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 .seg.slim button{min-height:38px;font-size:14px}
 .banner .holo img{aspect-ratio:3/1;object-fit:cover}
 .megaline{font:800 15px var(--body);color:#090B0F;background:linear-gradient(90deg,#A3E635,#FFE36E,#A3E635);background-size:200% 100%;border-radius:10px;padding:10px 14px;animation:shimmer 2.4s linear infinite}
-.banner.mega .holo{box-shadow:0 0 0 1px rgba(200,242,60,.6),0 0 50px rgba(200,242,60,.25)}
+.banner.mega .holo{box-shadow:0 0 0 1px rgba(163,230,53,.6),0 0 50px rgba(163,230,53,.25)}
 @keyframes shimmer{to{background-position:-200% 0}}
 /* motion */
 @keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes develop{from{opacity:.2;filter:blur(10px) saturate(.4);transform:scale(.97)}to{opacity:1;filter:none;transform:none}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-18px) scale(.98)}to{opacity:1;transform:none}}
-@keyframes pulseGlow{0%,100%{text-shadow:0 0 0 rgba(200,242,60,0)}50%{text-shadow:0 0 34px rgba(200,242,60,.55)}}
+@keyframes pulseGlow{0%,100%{text-shadow:0 0 0 rgba(163,230,53,0)}50%{text-shadow:0 0 34px rgba(163,230,53,.55)}}
 @keyframes press{0%{transform:scale(1)}40%{transform:scale(.94)}100%{transform:scale(1)}}
 .panel.enter{animation:up .4s cubic-bezier(.2,.8,.2,1) both}
 .stagger>*{animation:up .45s cubic-bezier(.2,.8,.2,1) both}
@@ -426,6 +426,64 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 @media (prefers-reduced-motion:reduce){.panel.enter,.stagger>*,.develop,.hitcard.enter,.big.mega,.megaline,.press{animation:none!important}.chip:hover{transform:none}}
 @media (prefers-reduced-motion:reduce){.mascot::before,.mascot::after,.mascot .bob,.mascot .eye,.mascot .lid{animation:none!important}
 .needle{transition:none}.pop,.shake,.print,.avatar,.avatar:hover,.results li[role=option],.result::before,.live i,.holo.sweep::after{animation:none}.holo{transform:none!important}}
+/* ===== lime + motion layer (matches dev-hector.com) ===== */
+:root{--lime:#A3E635;--lime-hi:#BEF264;--lime-deep:#3F6212;--lime-ink:#0C1204;--ease-spring:cubic-bezier(.34,1.4,.5,1)}
+::selection{background:rgba(163,230,53,.85);color:var(--lime-ink)}
+html{scrollbar-color:#3F6212 var(--bg)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:#2B3342;border-radius:99px;border:2px solid var(--bg)}::-webkit-scrollbar-thumb:hover{background:var(--lime-deep)}
+/* ambient: fine grid + a slow lime aurora behind everything */
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:linear-gradient(to right,rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.028) 1px,transparent 1px);background-size:48px 48px;
+  -webkit-mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 80%);mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 80%)}
+body::after{content:'';position:fixed;z-index:-1;pointer-events:none;width:70vmax;height:70vmax;left:50%;top:-35vmax;border-radius:50%;
+  background:radial-gradient(circle,rgba(163,230,53,.10),rgba(163,230,53,.03) 40%,transparent 68%);filter:blur(10px);animation:aurora 22s ease-in-out infinite alternate}
+@keyframes aurora{0%{transform:translate(-70%,0) scale(1)}50%{transform:translate(-30%,6vmax) scale(1.15)}100%{transform:translate(-55%,-2vmax) scale(.95)}}
+/* selected states: the Contact-button look — lime glass, lime edge */
+.tabs button[aria-selected="true"],.seg button[aria-pressed="true"],.cur button[aria-pressed="true"],.games button[aria-pressed="true"],.langs button[aria-pressed="true"],.toplists .chip[aria-pressed="true"],#showWhere .chip[aria-pressed="true"],#tierPresets .chip[aria-pressed="true"]{
+  background:linear-gradient(180deg,rgba(163,230,53,.24),rgba(163,230,53,.10));color:#ECFCCB;border-color:rgba(163,230,53,.8);box-shadow:inset 0 0 0 1px rgba(163,230,53,.75),0 0 22px -6px rgba(163,230,53,.55)}
+/* sliding glider: one lime pill that glides between options (JS adds .glide) */
+.glide{position:relative;isolation:isolate}
+.glide>.glider{position:absolute;z-index:-1;border-radius:9px;pointer-events:none;background:linear-gradient(180deg,rgba(163,230,53,.26),rgba(163,230,53,.10));
+  box-shadow:inset 0 0 0 1px rgba(163,230,53,.8),0 0 24px -6px rgba(163,230,53,.6);transition:transform .45s var(--ease-spring),width .45s var(--ease-spring),height .45s var(--ease-spring),opacity .2s}
+.glide.games>.glider,.glide.cur>.glider{border-radius:999px}.glide.cur>.glider{border-radius:7px}
+.glide>button[aria-selected="true"],.glide>button[aria-pressed="true"]{background:transparent!important;box-shadow:none!important;border-color:transparent!important;color:#ECFCCB}
+.glide>button{position:relative;transition:color .3s ease}
+/* primary actions: solid lime with a light sweep */
+.btn.primary{background:var(--lime);border-color:var(--lime);color:var(--lime-ink);position:relative;overflow:hidden;box-shadow:0 8px 28px -12px rgba(163,230,53,.7)}
+.btn.primary:hover{background:var(--lime-hi);border-color:var(--lime-hi)}
+.btn.primary::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.55) 48%,transparent 66%);transform:translateX(-120%);pointer-events:none}
+.btn.primary:hover::after{transition:transform .8s cubic-bezier(.2,.8,.2,1);transform:translateX(120%)}
+.ripple{position:absolute;border-radius:50%;pointer-events:none;background:rgba(190,242,100,.45);transform:scale(0);animation:ripple .6s ease-out forwards}
+.btn:not(.primary) .ripple{background:rgba(163,230,53,.22)}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+/* numbered steps: lime badges that light up as you reach them */
+.num{background:var(--lime);color:var(--lime-ink);box-shadow:0 0 0 4px rgba(163,230,53,.12),0 0 18px -2px rgba(163,230,53,.55)}
+/* inputs: lime focus everywhere */
+input:focus,select:focus{outline:none;border-color:rgba(190,242,100,.85);box-shadow:0 0 0 3px rgba(190,242,100,.18)}
+.chip:hover,.btn:hover,.results li:hover{border-color:rgba(163,230,53,.45)}
+.results li{position:relative}
+.results li[role=option]::before{content:'';position:absolute;left:0;top:18%;bottom:18%;width:3px;border-radius:3px;background:var(--lime);transform:scaleY(0);transition:transform .25s var(--ease-spring)}
+.results li[role=option]:hover::before,.results li[role=option][aria-selected="true"]::before{transform:scaleY(1)}
+.linkbtn{color:var(--lime-hi)}
+/* header hairline with a lime core */
+header.top{position:relative}
+header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(163,230,53,.55) 50%,transparent);opacity:.7}
+/* spotlight: a lime glow follows the pointer across panels */
+.spot{position:relative}
+.spot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;opacity:0;transition:opacity .35s ease;
+  background:radial-gradient(360px circle at var(--sx,50%) var(--sy,50%),rgba(163,230,53,.10),transparent 60%)}
+.spot:hover::before{opacity:1}
+.spot>*{position:relative;z-index:1}
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(16px);filter:blur(6px);transition:opacity .7s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1),filter .7s ease}
+.reveal.in{opacity:1;transform:none;filter:none}
+/* tier list: cards land with a little bounce */
+.tcard.land{animation:land .5s var(--ease-spring)}
+@keyframes land{0%{transform:scale(.6) rotate(-6deg)}60%{transform:scale(1.08) rotate(2deg)}100%{transform:none}}
+.trow.flash{animation:rowflash .7s ease}
+@keyframes rowflash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 70%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+@keyframes pulseGlow{0%,100%{text-shadow:0 0 0 rgba(163,230,53,0)}50%{text-shadow:0 0 34px rgba(163,230,53,.55)}}
+@media (prefers-reduced-motion:reduce){body::after{animation:none}.reveal{opacity:1;transform:none;filter:none;transition:none}.glide>.glider{transition:none}.tcard.land,.trow.flash,.ripple{animation:none}.btn.primary:hover::after{transition:none}}
 </style>
 </head>
 <body>
@@ -1160,7 +1218,7 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791522003';
+(function(){ var BUILD='1791522596';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -4466,6 +4524,68 @@ setInterval(refreshPrices, 10*60*1000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshPrices(); });
 Promise.all(['300px Anton','800 54px Archivo','32px "JetBrains Mono"'].map(f=>document.fonts.load(f).catch(()=>{})))
   .then(()=>document.fonts.ready).then(()=>{ updateCheck(); updateLog(); });
+// ---------- motion layer ----------
+(function(){
+  const reduce = calm;
+  // 1. gliders: one lime pill slides between the options of each segmented control
+  function glider(box){
+    if(box.querySelector(':scope>.glider')) return;
+    box.classList.add('glide'); const g = document.createElement('span'); g.className = 'glider'; box.prepend(g);
+    const place = (instant)=>{
+      const on = box.querySelector(':scope>button[aria-selected="true"],:scope>button[aria-pressed="true"]');
+      if(!on || !box.offsetParent){ g.style.opacity = 0; return; }
+      if(instant) g.style.transition = 'none';
+      g.style.opacity = 1; g.style.width = on.offsetWidth+'px'; g.style.height = on.offsetHeight+'px';
+      g.style.transform = 'translate('+on.offsetLeft+'px,'+on.offsetTop+'px)';
+      if(instant){ void g.offsetWidth; g.style.transition = ''; }
+    };
+    new MutationObserver(()=>place(false)).observe(box, {subtree: true, attributes: true, attributeFilter: ['aria-selected', 'aria-pressed']});
+    if('ResizeObserver' in window) new ResizeObserver(()=>place(true)).observe(box);
+    place(true);
+  }
+  const glideAll = ()=>document.querySelectorAll('.tabs,.seg,.cur,.games').forEach(glider);
+  glideAll(); document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click', ()=>setTimeout(glideAll, 30)));
+  // 2. ripple from where you press
+  document.addEventListener('pointerdown', e=>{
+    const b = e.target.closest && e.target.closest('.btn'); if(!b || reduce) return;
+    const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height)*2, d = document.createElement('span');
+    d.className = 'ripple'; d.style.cssText = 'width:'+s+'px;height:'+s+'px;left:'+(e.clientX - r.left - s/2)+'px;top:'+(e.clientY - r.top - s/2)+'px';
+    if(getComputedStyle(b).position === 'static') b.style.position = 'relative'; b.style.overflow = 'hidden';
+    b.append(d); setTimeout(()=>d.remove(), 650);
+  });
+  // 3. spotlight panels
+  const SPOT = '.col-out .result,.moves,.hitcard,.lifetime,.chosen,.trow,.tpool';
+  const markSpots = ()=>document.querySelectorAll(SPOT).forEach(el=>el.classList.add('spot'));
+  markSpots();
+  document.addEventListener('pointermove', e=>{
+    const el = e.target.closest && e.target.closest('.spot'); if(!el) return;
+    const r = el.getBoundingClientRect(); el.style.setProperty('--sx', (e.clientX - r.left)+'px'); el.style.setProperty('--sy', (e.clientY - r.top)+'px');
+  }, {passive: true});
+  // 4. reveal steps as they scroll in
+  if(!reduce && 'IntersectionObserver' in window){
+    const io = new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } }), {rootMargin: '0px 0px -8% 0px'});
+    const watch = ()=>document.querySelectorAll('.panel:not([hidden]) .step:not(.reveal),.panel:not([hidden]) .preview:not(.reveal),footer:not(.reveal)').forEach(el=>{
+      const r = el.getBoundingClientRect(); if(r.top < innerHeight*0.92) return;   // already on screen: leave it alone
+      el.classList.add('reveal'); io.observe(el); });
+    watch(); document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click', ()=>setTimeout(()=>{ watch(); markSpots(); }, 60)));
+  }
+  // 6. tier list: cards fly to their new tier (FLIP)
+  if(typeof paintTierBoard === 'function' && !reduce){
+    const orig = paintTierBoard;
+    paintTierBoard = function(){
+      const before = {}; document.querySelectorAll('#tierBoard .tcard,#tierPool .tcard').forEach(c=>{ before[c.dataset.k] = c.getBoundingClientRect(); });
+      orig();
+      document.querySelectorAll('#tierBoard .tcard,#tierPool .tcard').forEach(c=>{
+        const a = before[c.dataset.k], b = c.getBoundingClientRect();
+        if(!a){ c.classList.add('land'); return; }
+        const dx = a.left - b.left, dy = a.top - b.top; if(Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        c.animate([{transform: 'translate('+dx+'px,'+dy+'px) scale(1.12)', zIndex: 5}, {transform: 'none'}], {duration: 520, easing: 'cubic-bezier(.34,1.4,.5,1)'});
+        const row = c.closest('.trow'); if(row){ row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
+      });
+      markSpots();
+    };
+  }
+})();
 })();
 </script>
 </body>
