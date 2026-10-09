@@ -3365,6 +3365,66 @@ function topMedal(ctx, cx, cy, r, k, metal){
   ctx.font = '400 '+Math.round(r*1.15)+'px Anton'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#141414'; ctx.fillText(String(k+1), cx, cy + r*0.06);
   ctx.restore();
 }
+// ---------- tier list: your own ranking of any cards, as a share image ----------
+const TIER_COLS = ['#FF4D6D', '#FF8A3D', '#FFC83D', '#C6FF3D', '#3BE38A', '#3DC8FF', '#9A7CFF'];
+// T = {title, sub, prices, tiers: [{label, color, items: [search results]}]}
+function drawTierList(T){
+  if(!bcFonts()) return null;
+  const W = 1200, gx = 40, lw = 132, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(77);
+  const ax = gx + lw + 18, aw = W - gx - ax - 16, cols = 7, gap = 14, cw = (aw - gap*(cols-1))/cols, ch = Math.round(cw*1.395), pr = T.prices ? 30 : 0, rp = 18;
+  const tiers = T.tiers.map((t, i)=>{ const n = t.items.length, rows = Math.max(1, Math.ceil(n/cols)); return {...t, color: t.color || TIER_COLS[i % TIER_COLS.length], rows, h: rows*(ch + pr) + (rows-1)*gap + rp*2}; });
+  const H0 = 210, rgap = 10, foot = 120, H = H0 + tiers.reduce((s, t)=>s + t.h + rgap, 0) + foot;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#060608'; ctx.fillRect(0, 0, W, H);
+  const sp = ctx.createRadialGradient(W*0.3, 40, 10, W*0.3, 40, 700); sp.addColorStop(0, hexA(LIME, .16)); sp.addColorStop(1, hexA(LIME, 0)); ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H0 + 200);
+  // header: your avatar big, title, @handle
+  const av = 132, ax0 = gx, ay0 = 36, has = creatorOn() && creatorImg.complete && creatorImg.naturalWidth;
+  ctx.save(); ctx.beginPath(); ctx.arc(ax0 + av/2, ay0 + av/2, av/2 + 5, 0, Math.PI*2); ctx.fillStyle = LIME; ctx.shadowColor = hexA(LIME, .55); ctx.shadowBlur = 30; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.arc(ax0 + av/2, ay0 + av/2, av/2, 0, Math.PI*2); ctx.fillStyle = '#111'; ctx.fill(); ctx.clip();
+  const src = has ? creatorImg : (brandIcon.complete && brandIcon.naturalWidth ? brandIcon : null); if(src) ctx.drawImage(src, ax0, ay0, av, av); ctx.restore();
+  const tx = ax0 + av + 34, tmax = W - gx - tx;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  let fs = 64; ctx.font = '400 '+fs+'px Anton'; spaced(ctx, 1); while(ctx.measureText(T.title).width > tmax && fs > 34){ fs -= 2; ctx.font = '400 '+fs+'px Anton'; }
+  const tg = ctx.createLinearGradient(0, 60, 0, 125); tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#CFC9BC'); ctx.fillStyle = tg; ctx.fillText(T.title, tx, 108); spaced(ctx, 0);
+  if(T.sub){ ctx.font = '600 17px Archivo'; ctx.fillStyle = 'rgba(244,241,234,.7)'; ctx.fillText(fitText(ctx, T.sub, tmax), tx, 142); }
+  if(creatorOn()){ ctx.font = '700 17px "JetBrains Mono"'; spaced(ctx, 1); ctx.fillStyle = LIME; ctx.fillText('@'+creator.handle, tx, 174); spaced(ctx, 0); }
+  // tiers
+  let y = H0;
+  tiers.forEach(t=>{
+    const col = t.color, val = t.items.reduce((s, x)=>s + (x.best || 0), 0);
+    // row: dark panel with the tier colour bleeding in from the left
+    rrect(ctx, gx, y, W - gx*2, t.h, 14); ctx.fillStyle = '#0E0E12'; ctx.fill();
+    ctx.save(); rrect(ctx, gx, y, W - gx*2, t.h, 14); ctx.clip(); const bg = ctx.createLinearGradient(gx, 0, W - gx, 0); bg.addColorStop(0, hexA(col, .16)); bg.addColorStop(.45, hexA(col, .03)); bg.addColorStop(1, hexA(col, 0)); ctx.fillStyle = bg; ctx.fillRect(gx, y, W - gx*2, t.h);
+    // label block
+    const lg = ctx.createLinearGradient(gx, y, gx + lw, y + t.h); lg.addColorStop(0, col); lg.addColorStop(1, hexA(col, .72)); ctx.fillStyle = lg; ctx.fillRect(gx, y, lw, t.h); ctx.restore();
+    rrect(ctx, gx, y, W - gx*2, t.h, 14); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(col, .35); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#0B0B0C';
+    let lf = t.label.length > 2 ? 40 : 76; ctx.font = '400 '+lf+'px Anton'; while(ctx.measureText(t.label).width > lw - 20 && lf > 18){ lf -= 2; ctx.font = '400 '+lf+'px Anton'; }
+    const mid = y + t.h/2; ctx.fillText(t.label, gx + lw/2, mid + lf*0.36 - (T.prices && t.items.length ? 12 : 0));
+    if(T.prices && t.items.length){ ctx.font = '700 19px "Barlow Semi Condensed"'; ctx.fillStyle = 'rgba(11,11,12,.78)'; ctx.fillText(money(fromUsd(val), 0), gx + lw/2, mid + lf*0.36 + 18); }
+    // cards
+    t.items.forEach((x, k)=>{
+      const c = k % cols, r = Math.floor(k / cols), X = ax + c*(cw + gap), Y = y + rp + r*(ch + pr + gap);
+      topCard(ctx, x, X, Y, cw, ch, null, .5);
+      if(T.prices){ ctx.textAlign = 'center'; ctx.font = '700 19px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(x.best != null ? topMoney(x.best) : '—', X + cw/2, Y + ch + 23); }
+    });
+    if(!t.items.length){ ctx.textAlign = 'left'; ctx.font = '600 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText('NOTHING HERE', ax + 6, mid + 5); spaced(ctx, 0); }
+    y += t.h + rgap;
+  });
+  // footer: the mascot has an opinion
+  const fy = H - foot + 22;
+  if(brandIcon.complete && brandIcon.naturalWidth){ ctx.save(); ctx.shadowColor = 'rgba(140,90,255,.45)'; ctx.shadowBlur = 18; ctx.drawImage(brandIcon, gx - 2, fy, 64, 64); ctx.restore(); }
+  const vals = tiers.filter(t=>t.items.length).map(t=>({l: t.label, v: t.items.reduce((s, x)=>s + (x.best || 0), 0)}));
+  let q = ['Ranked by taste, not price.', 'Fight about it in the replies.'];
+  if(T.prices && vals.length > 1){ const a = vals[0], z = vals[vals.length-1]; q = z.v > a.v ? [z.l+' tier costs more than '+a.l+' tier.', 'Taste over money. Respect.'] : [a.l+' tier: '+money(fromUsd(a.v), 0)+'. '+z.l+' tier: '+money(fromUsd(z.v), 0)+'.', 'Expensive taste, honestly.']; }
+  ctx.textAlign = 'left'; topBubble(ctx, gx + 84, fy - 1, 520, q, LIME);
+  ctx.textAlign = 'right'; ctx.font = '400 26px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', W - gx, fy + 30); spaced(ctx, 0);
+  ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, fy + 52);
+  if(T.prices){ ctx.fillStyle = faint; ctx.fillText('TCGPLAYER NM · '+cur+' · '+today, W - gx, fy + 74); } spaced(ctx, 0); ctx.textAlign = 'left';
+  grainVignette(ctx, rnd, .02, .4);
+  return cv;
+}
+window.__drawTierList = drawTierList;   // preview hook (temporary)
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
   const n = topItems.length, W = 1200, gx = 40, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(n*31 + 7);
