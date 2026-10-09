@@ -716,6 +716,10 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
     <div class="step">
       <div class="stephead"><span class="num">4</span>Style</div>
       <div class="seg" id="tierPrices" role="group" aria-label="Prices"><button type="button" data-v="1" aria-pressed="true">Show prices</button><button type="button" data-v="0" aria-pressed="false">No prices</button></div>
+      <div class="seg" id="tierSay" role="group" aria-label="Mascot bubble"><button type="button" data-v="1" aria-pressed="true">Mascot bubble on</button><button type="button" data-v="0" aria-pressed="false">Bubble off</button></div>
+      <div id="tierSayOpts" class="field"><label for="tierSay1">What the mascot says (leave blank for the auto line)</label>
+        <input id="tierSay1" type="text" maxlength="48" style="font-family:var(--body);font-weight:700;font-size:16px">
+        <input id="tierSay2" type="text" maxlength="60" style="font-family:var(--body);font-size:15px"></div>
       <div class="seg" id="tierWm" role="group" aria-label="Watermark"><button type="button" data-v="1" aria-pressed="true">Watermark on</button><button type="button" data-v="0" aria-pressed="false">Watermark off</button></div>
       <div id="tierWmOpts" style="display:flex;flex-direction:column;gap:10px">
         <div class="field"><label>Watermark colour</label><div class="swatches" id="tierWmCols"></div></div>
@@ -1154,7 +1158,7 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791507689';
+(function(){ var BUILD='1791507814';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3778,6 +3782,12 @@ function topMedal(ctx, cx, cy, r, k, metal){
 // ---------- tier list: your own ranking of any cards, as a share image ----------
 const TIER_COLS = ['#FF4D6D', '#FF8A3D', '#FFC83D', '#C6FF3D', '#3BE38A', '#3DC8FF', '#9A7CFF'];
 // T = {title, sub, prices, tiers: [{label, color, items: [search results]}]}
+function tierAutoSay(T){
+  const vals = T.tiers.filter(t=>t.items.length).map(t=>({l: t.label, v: t.items.reduce((s, x)=>s + (x.best || 0), 0)}));
+  let q = ['Ranked by taste, not price.', 'Fight about it in the replies.'];
+  if(T.prices && vals.length > 1){ const a = vals[0], z = vals[vals.length-1]; q = z.v > a.v ? [z.l+' tier costs more than '+a.l+' tier.', 'Taste over money. Respect.'] : [a.l+' tier: '+money(fromUsd(a.v), 0)+'. '+z.l+' tier: '+money(fromUsd(z.v), 0)+'.', 'Expensive taste, honestly.']; }
+  return q;
+}
 function drawTierList(T){
   if(!bcFonts()) return null;
   const W = 1200, gx = 40, lw = 132, INK = '#F4F1EA', LIME = '#C6FF3D', faint = 'rgba(242,239,232,.5)', rnd = bcRand(77);
@@ -3825,10 +3835,9 @@ function drawTierList(T){
   // footer: the mascot has an opinion
   const fy = H - foot + 22;
   if(brandIcon.complete && brandIcon.naturalWidth){ ctx.save(); ctx.shadowColor = 'rgba(140,90,255,.45)'; ctx.shadowBlur = 18; ctx.drawImage(brandIcon, gx - 2, fy, 64, 64); ctx.restore(); }
-  const vals = tiers.filter(t=>t.items.length).map(t=>({l: t.label, v: t.items.reduce((s, x)=>s + (x.best || 0), 0)}));
-  let q = ['Ranked by taste, not price.', 'Fight about it in the replies.'];
-  if(T.prices && vals.length > 1){ const a = vals[0], z = vals[vals.length-1]; q = z.v > a.v ? [z.l+' tier costs more than '+a.l+' tier.', 'Taste over money. Respect.'] : [a.l+' tier: '+money(fromUsd(a.v), 0)+'. '+z.l+' tier: '+money(fromUsd(z.v), 0)+'.', 'Expensive taste, honestly.']; }
-  ctx.textAlign = 'left'; topBubble(ctx, gx + 84, fy - 1, 520, q, LIME);
+  let q = tierAutoSay(T);
+  if(T.say && (T.say.l1 || T.say.l2)) q = [T.say.l1 || '', T.say.l2 || ''];
+  if(!T.say || T.say.on !== false){ if(!q[0] && q[1]) q = [q[1], '']; if(q[0]) { ctx.textAlign = 'left'; topBubble(ctx, gx + 84, fy - 1, 520, q, LIME); } }
   ctx.textAlign = 'right'; ctx.font = '400 26px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', W - gx, fy + 30); spaced(ctx, 0);
   ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, fy + 52);
   if(T.prices){ ctx.fillStyle = faint; ctx.fillText('TCGPLAYER NM · '+cur+' · '+today, W - gx, fy + 74); } spaced(ctx, 0); ctx.textAlign = 'left';
@@ -3857,9 +3866,10 @@ const TIER_PRESETS = {
   Ember: ['#FF3D3D', '#FF6A2B', '#FF9A2B', '#FFC24A', '#B9A27A', '#7D7468', '#4A4743']
 };
 const WM_COLS = ['#C6FF3D', '#F4F1EA', '#E8B931', '#FF4D6D', '#3DC8FF', '#9A7CFF', '#0B0B0C'];
-const tierNew = () => ({title: '', sub: '', prices: true, wm: {on: true, color: '#C6FF3D', op: 16}, preset: 'Rainbow',
+const tierNew = () => ({title: '', sub: '', prices: true, say: {on: true, l1: '', l2: ''}, wm: {on: true, color: '#C6FF3D', op: 16}, preset: 'Rainbow',
   tiers: ['S', 'A', 'B', 'C', 'D', 'F'].map((l, i)=>({label: l, color: TIER_PRESETS.Rainbow[i], keys: []})), pool: [], items: {}});
-let tier = store.get('tier1') || tierNew(), tierSel = null, tTier, tTierSearch;
+let tier = store.get('tier1') || tierNew(); if(!tier.say) tier.say = {on: true, l1: '', l2: ''};
+let tierSel = null, tTier, tTierSearch;
 const tKey = x => x.id+'|'+(x.variant||'');
 const tLab = c => { const n = parseInt(c.slice(1), 16); return (0.299*(n>>16) + 0.587*((n>>8)&255) + 0.114*(n&255))/255 > .55 ? '#0B0B0C' : '#F4F1EA'; };
 function saveTier(){ store.set('tier1', tier); }
@@ -3939,13 +3949,16 @@ function paintTierStyle(){
   const ci = document.createElement('input'); ci.type = 'color'; ci.value = tier.wm.color; ci.setAttribute('aria-label', 'Pick any watermark colour');
   ci.addEventListener('input', ()=>{ tier.wm.color = ci.value; saveTier(); drawTierSoon(); }); ci.addEventListener('change', paintTierStyle); sw.append(ci);
   $('tierTitle').value = tier.title; $('tierSub').value = tier.sub;
+  document.querySelectorAll('#tierSay button').forEach(b=>b.setAttribute('aria-pressed', (b.dataset.v === '1') === tier.say.on));
+  $('tierSayOpts').style.display = tier.say.on ? 'flex' : 'none'; $('tierSay1').value = tier.say.l1; $('tierSay2').value = tier.say.l2; tierSayHints();
 }
-function tierChanged(){ saveTier(); paintTierBoard(); paintTierPresets(); drawTierSoon(); }
+function tierSayHints(){ const q = tierAutoSay(tierState()); $('tierSay1').placeholder = q[0] || 'Line 1'; $('tierSay2').placeholder = q[1] || 'Line 2'; }
+function tierChanged(){ saveTier(); paintTierBoard(); paintTierPresets(); tierSayHints(); drawTierSoon(); }
 function tierTitleText(){ return tier.title.trim() || (creatorOn() ? creator.handle+'’s Tier List' : 'My Tier List'); }
 function tierState(){
   return {title: tierTitleText(), sub: tier.sub.trim(), prices: tier.prices,
     tiers: tier.tiers.map(t=>({label: t.label.trim() || '?', color: t.color, items: t.keys.map(k=>tier.items[k]).filter(Boolean)})),
-    watermark: {on: tier.wm.on, color: tier.wm.color, opacity: tier.wm.op/100}};
+    watermark: {on: tier.wm.on, color: tier.wm.color, opacity: tier.wm.op/100}, say: {on: tier.say.on, l1: tier.say.l1.trim(), l2: tier.say.l2.trim()}};
 }
 function drawTierSoon(){
   clearTimeout(tTier);
@@ -3999,6 +4012,8 @@ $('tierReset').addEventListener('click', ()=>{ tier.tiers.forEach(t=>{ tier.pool
 $('tierClear').addEventListener('click', ()=>{ if(!confirm('Clear this tier list and start over?')) return; tier = tierNew(); tierSel = null; paintTierStyle(); tierChanged(); });
 document.querySelectorAll('#tierPrices button').forEach(b=>b.addEventListener('click', ()=>{ tier.prices = b.dataset.v === '1'; saveTier(); paintTierStyle(); drawTierSoon(); }));
 document.querySelectorAll('#tierWm button').forEach(b=>b.addEventListener('click', ()=>{ tier.wm.on = b.dataset.v === '1'; saveTier(); paintTierStyle(); drawTierSoon(); }));
+document.querySelectorAll('#tierSay button').forEach(b=>b.addEventListener('click', ()=>{ tier.say.on = b.dataset.v === '1'; saveTier(); paintTierStyle(); drawTierSoon(); }));
+['tierSay1', 'tierSay2'].forEach((id, i)=>$(id).addEventListener('input', ()=>{ tier.say[i ? 'l2' : 'l1'] = $(id).value; saveTier(); drawTierSoon(); }));
 $('tierWmOp').addEventListener('input', ()=>{ tier.wm.op = Number($('tierWmOp').value); saveTier(); drawTierSoon(); });
 $('saveTier').addEventListener('click', ()=>{ const cv = drawTierList(tierState()); if(cv) save(cv, 'tier-list.jpg', $('statusTier'), 'image/jpeg'); });
 $('copyTier').addEventListener('click', ()=>{
