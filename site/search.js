@@ -250,6 +250,7 @@ window.__noShare = true;
       score[i]=v;
     });
     hits.sort(function(a,b){ return score[b]-score[a]; });
+    if(q.get('sort')==='price') hits.sort(function(a,b){ var pa=best(c.items[a][5],c.items[a][6]), pb=best(c.items[b][5],c.items[b][6]); return (pb==null?-1:pb)-(pa==null?-1:pa); });
     var off=Math.max(0, parseInt(q.get('offset'),10)||0), top=hits.slice(off, off+30);
     return {results:top.map(function(i){ return res(c,i); }), rows:top, total:hits.length, offset:off, loose:loose};
   }

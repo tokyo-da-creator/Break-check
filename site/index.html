@@ -696,6 +696,7 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
     <div class="step">
       <div class="stephead"><span class="num">2</span><label for="tierSearch">Add cards</label></div>
       <input id="tierSearch" class="search" type="search" autocomplete="off" placeholder="Any card, e.g. pikachu, moonbreon, charizard 199">
+      <div class="seg slim" id="tierSort" role="group" aria-label="Sort results" hidden><button type="button" data-v="match" aria-pressed="true">Best match</button><button type="button" data-v="price" aria-pressed="false">Highest price first</button></div>
       <ul class="results" id="tierResults" hidden></ul>
       <div class="hint">Tap a card to add it. Or add every card of one Pokémon at once:</div>
       <div class="seg slim" id="tierEra" role="group" aria-label="Era" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-v="all" aria-pressed="false">All eras</button><button type="button" data-v="swsh" aria-pressed="true">Sword &amp; Shield+</button><button type="button" data-v="sv" aria-pressed="false">Scarlet &amp; Violet+</button></div>
@@ -3645,29 +3646,46 @@ function drawTierSoon(){
   }, 220);
 }
 function openTier(){ paintTierStyle(); paintTierPresets(); paintTierBoard(); drawTierSoon(); }
-// search: tap a result to add it
-async function tierFind(){
+// search: tap a result to add it. Pages of 30, more load as you scroll (or tap Show more).
+let tierQ = {q: '', off: 0, total: 0, busy: false};
+function tierResultLi(x){
+  const li = document.createElement('li'); li.setAttribute('role', 'option'); if(tier.items[tKey(x)]) li.classList.add('added');
+  const mid = document.createElement('div'); mid.style.minWidth = '0';
+  const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name+(x.number ? ' '+x.number : '');
+  const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : '', x.best != null ? topMoney(x.best) : ''].filter(Boolean).join(' · ');
+  mid.append(nm, sb); const ad = document.createElement('span'); ad.className = 'addb'; ad.textContent = tier.items[tKey(x)] ? '✓' : '+';
+  li.append(thumb(x.id, false), mid, ad);
+  li.addEventListener('click', ()=>{ if(tierAddItem(x)){ li.classList.add('added'); ad.textContent = '✓'; tierChanged(); } });
+  return li;
+}
+async function tierFind(more){
   const q = $('tierSearch').value.trim(), ul = $('tierResults'); $('tierFill').disabled = q.length < 2;
   $('tierFill').textContent = q.length < 2 ? 'Add every card of a Pokémon' : 'Add every '+q.replace(/\b\w/g, c=>c.toUpperCase())+' card';
-  if(q.length < 2){ ul.hidden = true; return; }
+  $('tierSort').hidden = q.length < 2;
+  if(q.length < 2){ ul.hidden = true; tierQ = {q: '', off: 0, total: 0, busy: false}; return; }
+  if(more && (tierQ.busy || tierQ.q !== q || tierQ.off >= tierQ.total)) return;
+  const off = more ? tierQ.off : 0, sort = segVal('tierSort'); tierQ.busy = true;
   try{
-    const r = await fetch('/api/search?kind=card&q='+encodeURIComponent(q)), d = await r.json(); if($('tierSearch').value.trim() !== q) return;
-    ul.textContent = '';
-    (d.results||[]).filter(x=>x.kind === 'card').slice(0, 30).forEach(x=>{
-      const li = document.createElement('li'); li.setAttribute('role', 'option'); if(tier.items[tKey(x)]) li.classList.add('added');
-      const mid = document.createElement('div'); mid.style.minWidth = '0';
-      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = x.name+(x.number ? ' '+x.number : '');
-      const sb = document.createElement('div'); sb.className = 'sub'; sb.textContent = [shortSet(x.set), x.variant, x.jp ? 'JP' : '', x.best != null ? topMoney(x.best) : ''].filter(Boolean).join(' · ');
-      mid.append(nm, sb); const ad = document.createElement('span'); ad.className = 'addb'; ad.textContent = tier.items[tKey(x)] ? '✓' : '+';
-      li.append(thumb(x.id, false), mid, ad);
-      li.addEventListener('click', ()=>{ if(tierAddItem(x)){ li.classList.add('added'); ad.textContent = '✓'; tierChanged(); } });
-      ul.append(li);
-    });
+    const r = await fetch('/api/search?kind=card&q='+encodeURIComponent(q)+(off ? '&offset='+off : '')+(sort === 'price' ? '&sort=price' : '')), d = await r.json();
+    if($('tierSearch').value.trim() !== q){ tierQ.busy = false; return; }
+    if(!more){ ul.textContent = ''; ul.scrollTop = 0; }
+    const old = ul.querySelector('.tmore'); if(old) old.remove();
+    const rows = (d.results||[]).filter(x=>x.kind === 'card');
+    rows.forEach(x=>ul.append(tierResultLi(x)));
+    tierQ = {q, off: off + (d.results||[]).length, total: d.total != null ? d.total : off + rows.length, busy: false};
     if(!ul.children.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = d.note || 'No cards found.'; ul.append(li); }
+    else{
+      const li = document.createElement('li'); li.className = 'empty tmore';
+      if(tierQ.off < tierQ.total){ li.style.cursor = 'pointer'; li.innerHTML = '<span style="color:var(--win);font-weight:700">Show more</span> <span class="sub">· '+tierQ.off+' of '+tierQ.total+'</span>'; li.addEventListener('click', ()=>tierFind(true)); }
+      else li.innerHTML = '<span class="sub">All '+tierQ.total+' results</span>';
+      ul.append(li);
+    }
     ul.hidden = false;
-  }catch(e){}
+  }catch(e){ tierQ.busy = false; }
 }
-$('tierSearch').addEventListener('input', ()=>{ clearTimeout(tTierSearch); tTierSearch = setTimeout(tierFind, 180); });
+$('tierResults').addEventListener('scroll', ()=>{ const ul = $('tierResults'); if(ul.scrollTop + ul.clientHeight > ul.scrollHeight - 160) tierFind(true); });
+document.querySelectorAll('#tierSort button').forEach(b=>b.addEventListener('click', ()=>{ document.querySelectorAll('#tierSort button').forEach(o=>o.setAttribute('aria-pressed', o === b)); tierFind(false); }));
+$('tierSearch').addEventListener('input', ()=>{ clearTimeout(tTierSearch); tTierSearch = setTimeout(()=>tierFind(false), 180); });
 ['tierEra', 'tierRar', 'tierLang'].forEach(id=>document.querySelectorAll('#'+id+' button').forEach(b=>b.addEventListener('click', ()=>{ document.querySelectorAll('#'+id+' button').forEach(o=>o.setAttribute('aria-pressed', o === b)); })));
 const segVal = id => (document.querySelector('#'+id+' button[aria-pressed="true"]') || {}).dataset.v;
 $('tierFill').addEventListener('click', async ()=>{
