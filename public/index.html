@@ -1048,7 +1048,7 @@ header.top .tabs{margin-top:18px}
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791506691';
+(function(){ var BUILD='1791507245';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3702,10 +3702,11 @@ function drawTierList(T){
     // label block
     const lg = ctx.createLinearGradient(gx, y, gx + lw, y + t.h); lg.addColorStop(0, col); lg.addColorStop(1, hexA(col, .72)); ctx.fillStyle = lg; ctx.fillRect(gx, y, lw, t.h); ctx.restore();
     rrect(ctx, gx, y, W - gx*2, t.h, 14); ctx.lineWidth = 1.5; ctx.strokeStyle = hexA(col, .35); ctx.stroke();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#0B0B0C';
+    const n = parseInt(col.slice(1), 16), lum = (0.299*(n>>16) + 0.587*((n>>8)&255) + 0.114*(n&255))/255, lab = lum > .55 ? '#0B0B0C' : '#F4F1EA';
+    ctx.textAlign = 'center'; ctx.fillStyle = lab;
     let lf = t.label.length > 2 ? 40 : 76; ctx.font = '400 '+lf+'px Anton'; while(ctx.measureText(t.label).width > lw - 20 && lf > 18){ lf -= 2; ctx.font = '400 '+lf+'px Anton'; }
     const mid = y + t.h/2; ctx.fillText(t.label, gx + lw/2, mid + lf*0.36 - (T.prices && t.items.length ? 12 : 0));
-    if(T.prices && t.items.length){ ctx.font = '700 19px "Barlow Semi Condensed"'; ctx.fillStyle = 'rgba(11,11,12,.78)'; ctx.fillText(money(fromUsd(val), 0), gx + lw/2, mid + lf*0.36 + 18); }
+    if(T.prices && t.items.length){ ctx.font = '700 19px "Barlow Semi Condensed"'; ctx.fillStyle = hexA(lab, .8); ctx.fillText(money(fromUsd(val), 0), gx + lw/2, mid + lf*0.36 + 18); }
     // cards
     t.items.forEach((x, k)=>{
       const c = k % cols, r = Math.floor(k / cols), X = ax + c*(cw + gap), Y = y + rp + r*(ch + pr + gap);
@@ -3725,6 +3726,19 @@ function drawTierList(T){
   ctx.textAlign = 'right'; ctx.font = '400 26px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', W - gx, fy + 30); spaced(ctx, 0);
   ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, fy + 52);
   if(T.prices){ ctx.fillStyle = faint; ctx.fillText('TCGPLAYER NM · '+cur+' · '+today, W - gx, fy + 74); } spaced(ctx, 0); ctx.textAlign = 'left';
+  // watermark: your @handle tiled on the diagonal over everything, so a crop can't lose it
+  const wm = T.watermark;
+  if(wm && wm.on && (wm.text || creatorOn())){
+    const txt = wm.text || '@'+creator.handle, col = wm.color || LIME, al = wm.opacity != null ? wm.opacity : .16;
+    ctx.save(); ctx.font = '800 34px Archivo'; spaced(ctx, 1); const tw = ctx.measureText(txt).width, sx = tw + 120, sy = 150;
+    ctx.translate(W/2, H/2); ctx.rotate(-Math.PI/7);
+    const R = Math.hypot(W, H)/2 + sx;
+    for(let yy = -R, row = 0; yy < R; yy += sy, row++) for(let xx = -R + (row % 2 ? sx/2 : 0); xx < R; xx += sx){
+      ctx.globalAlpha = al*0.9; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(txt, xx, yy);
+      ctx.globalAlpha = al; ctx.fillStyle = col; ctx.fillText(txt, xx, yy);
+    }
+    ctx.restore();
+  }
   grainVignette(ctx, rnd, .02, .4);
   return cv;
 }
