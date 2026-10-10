@@ -1294,6 +1294,8 @@ function trimToProduct(im){
   out.getContext('2d').drawImage(im, l, t, out.width, out.height, 0, 0, out.width, out.height);
   return out;
 }
+// Sealed product off its white studio backdrop (same cut-out the break cards use), or the photo as-is if it can't be cut.
+function sealedCut(a, id){ if(!a) return null; try{ return cutoutWhite(a.img, 'sc'+id) || a.img; }catch(e){ return a.img; } }
 function productArt(id, sealed){
   if(!id) return null;
   const key = id+(sealed?'s':'c');
@@ -3679,7 +3681,7 @@ function topCard(ctx, x, X, Y, w, h, metal, foilS){
   if(metal){ [[90, .22], [40, .45], [14, .8]].forEach(([b, al])=>{ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.shadowColor = hexA(metal.glow, al); ctx.shadowBlur = b; ctx.fillStyle = '#111'; ctx.fill(); ctx.restore(); }); }
   if(a && sealedX){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip();
     const tg = ctx.createLinearGradient(X, Y, X, Y + h); tg.addColorStop(0, '#1C1C1F'); tg.addColorStop(1, '#0B0B0C'); ctx.fillStyle = tg; ctx.fillRect(X, Y, w, h);
-    const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(w*0.86/iw, h*0.86/ih);
+    const im = sealedCut(a, x.id), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(w*0.86/iw, h*0.86/ih);
     ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
   else if(a){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(w/iw, h/ih); ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
   topFoil(ctx, X, Y, w, h, rad, foilS);
@@ -4725,8 +4727,11 @@ function drawCompare(A, B){
   // pictures
   const pic = (it, cx, col)=>{ const sealed = it.kind === 'sealed', a = productArt(it.id, sealed); const PW = 360, PH = 230, X = cx - PW/2, Y = 104;
     if(!a){ rrect(ctx, X + 60, Y, PW - 120, PH, 16); ctx.fillStyle = '#121214'; ctx.fill(); return; }
-    const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(PW/iw, PH/ih), w = iw*k, h = ih*k, x = cx - w/2, y = Y + (PH - h)/2;
-    ctx.save(); ctx.shadowColor = hexA(col, .35); ctx.shadowBlur = 60; ctx.shadowOffsetY = 10; if(!sealed){ rrect(ctx, x, y, w, h, w*0.045); ctx.fillStyle = '#000'; ctx.fill(); } ctx.drawImage(im, x, y, w, h); ctx.restore(); };
+    const im = sealed ? sealedCut(a, it.id) : a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(PW/iw, PH/ih), w = iw*k, h = ih*k, x = cx - w/2, y = Y + (PH - h)/2;
+    // soft floor light under the product
+    const fl = ctx.createRadialGradient(cx, y + h, 4, cx, y + h, w*0.62); fl.addColorStop(0, hexA(col, .22)); fl.addColorStop(1, hexA(col, 0)); ctx.save(); ctx.translate(cx, y + h); ctx.scale(1, 0.18); ctx.translate(-cx, -(y + h)); ctx.fillStyle = fl; ctx.fillRect(cx - w, y + h - w, w*2, w*2); ctx.restore();
+    ctx.save(); ctx.shadowColor = sealed ? 'rgba(0,0,0,.75)' : hexA(col, .35); ctx.shadowBlur = sealed ? 34 : 60; ctx.shadowOffsetY = sealed ? 16 : 10; if(!sealed){ rrect(ctx, x, y, w, h, w*0.045); ctx.fillStyle = '#000'; ctx.fill(); } ctx.drawImage(im, x, y, w, h); ctx.restore();
+    if(sealed){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .08; ctx.shadowColor = col; ctx.shadowBlur = 50; ctx.drawImage(im, x, y, w, h); ctx.restore(); } };
   pic(cmp.a, 270, LIME); pic(cmp.b, 810, WHITE);
   // VS
   ctx.save(); ctx.beginPath(); ctx.arc(540, 220, 44, 0, Math.PI*2); ctx.fillStyle = '#030303'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(244,244,245,.25)'; ctx.stroke();
