@@ -288,6 +288,25 @@ footer .f-bottom a:hover{text-decoration:underline}
 .print{animation:printIn .8s cubic-bezier(.2,.8,.2,1)}
 .results li[role=option]{animation:rise .22s ease-out both}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+
+/* ---------- Compare two ---------- */
+.cmpslot{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start}
+.cmptag{display:grid;place-items:center;width:34px;height:34px;margin-top:9px;border-radius:50%;background:var(--win);color:var(--ink);font:400 18px Anton,var(--body)}
+.cmptag.b{background:#F4F4F5}
+.cmpbody{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cmpverdict{font:800 20px/1.3 var(--body);text-wrap:balance}
+.cmpverdict b{color:var(--win)}
+.cmprace{margin-top:8px;font:600 15px/1.4 var(--body);color:var(--muted)}
+.cmprace b{color:var(--fg)}
+.cmptable{width:100%;border-collapse:collapse;font-size:14px}
+.cmptable th,.cmptable td{padding:10px 8px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:top}
+.cmptable th{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left}
+.cmptable thead th{text-align:right}
+.cmptable thead th:first-child{text-align:left}
+.cmptable thead th span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font:400 13px Anton,var(--body);color:var(--ink)}
+.cmptable td{font:700 15px var(--mono);white-space:nowrap}
+.cmptable td.win{color:var(--win)}
+.cmptable td small{display:block;font:500 11px var(--mono);color:var(--muted)}
 /* ---------- PSA sales ---------- */
 #panel-psa input::placeholder{color:#5A5A60;font-style:italic}
 #psaDate{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left}
@@ -752,6 +771,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <button class="chip" type="button" data-k="gain">Biggest gainers</button>
         <button class="chip" type="button" data-k="drop">Biggest drops</button>
         <button class="chip" type="button" data-k="sold">Most sold</button>
+        <button class="chip" type="button" data-k="vs">Compare two</button>
       </div>
     </div>
     <div class="step" id="topSetStep">
@@ -776,7 +796,29 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       </div>
       <div class="seg slim" id="topLang" role="group" aria-label="Language" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-l="" aria-pressed="true">All</button><button type="button" data-l="en" aria-pressed="false">English</button><button type="button" data-l="jp" aria-pressed="false">Japanese</button></div>
     </div>
-    <div class="step">
+    <div class="step" id="cmpStep" hidden>
+      <div class="stephead"><span class="num">2</span><label for="cmpSearchA">Pick two to compare</label></div>
+      <div class="hint">Any two products or cards: two ETBs, two booster boxes, a box vs an ETB, two packs.</div>
+      <div class="cmpslot" data-s="a">
+        <span class="cmptag">A</span>
+        <div class="cmpbody">
+          <input id="cmpSearchA" class="search" type="search" autocomplete="off" placeholder="e.g. prismatic evolutions etb" role="combobox" aria-expanded="false" aria-controls="cmpResultsA">
+          <ul class="results" id="cmpResultsA" role="listbox" hidden></ul>
+          <div class="chosen" id="cmpChosenA" hidden><div style="min-width:0"><div class="nm" id="cmpNameA"></div><div class="sub" id="cmpSubA"></div></div><button class="linkbtn" id="cmpClearA" type="button">Change</button></div>
+        </div>
+      </div>
+      <div class="cmpslot" data-s="b">
+        <span class="cmptag b">B</span>
+        <div class="cmpbody">
+          <input id="cmpSearchB" class="search" type="search" autocomplete="off" placeholder="e.g. journey together etb" role="combobox" aria-expanded="false" aria-controls="cmpResultsB">
+          <ul class="results" id="cmpResultsB" role="listbox" hidden></ul>
+          <div class="chosen" id="cmpChosenB" hidden><div style="min-width:0"><div class="nm" id="cmpNameB"></div><div class="sub" id="cmpSubB"></div></div><button class="linkbtn" id="cmpClearB" type="button">Change</button></div>
+        </div>
+      </div>
+      <button class="linkbtn" id="cmpSwap" type="button">⇄ Swap A and B</button>
+      <div class="seg" role="group" aria-label="Chart range" style="grid-template-columns:repeat(3,1fr)"><button id="cmp-month" type="button" aria-pressed="false">30 days</button><button id="cmp-quarter" type="button" aria-pressed="true">90 days</button><button id="cmp-annual" type="button" aria-pressed="false">1 year</button></div>
+    </div>
+    <div class="step" id="topCntStep">
       <div class="stephead"><span class="num">3</span>How many?</div>
       <div class="seg" role="group" aria-label="How many"><button id="cnt-10" type="button" aria-pressed="false">Top 10</button><button id="cnt-20" type="button" aria-pressed="true">Top 20</button></div>
     </div>
@@ -792,6 +834,22 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="btns"><button class="btn primary" id="saveTop">Save image</button><button class="btn" id="copyTop">Copy caption</button></div>
       </div>
       <div class="status" id="statusTop"></div>
+    </div>
+    <div class="result" id="cmpResult" aria-live="polite" hidden>
+      <div class="stephead"><span class="num">3</span>Head to head</div>
+      <div class="empty-state" id="cmpEmpty">Pick A and B. You’ll get today’s prices side by side, price per pack, how each has moved and a chart of both.</div>
+      <div id="cmpOut" style="display:flex;flex-direction:column;gap:12px" hidden>
+        <div class="cmpverdict" id="cmpVerdict"></div>
+        <div class="tw"><table class="cmptable" id="cmpTable"></table></div>
+        <div class="hint" id="cmpNote"></div>
+        <div class="creator" data-creator></div>
+        <div class="btns"><button class="btn primary" id="saveCmp" type="button">Save image</button><button class="btn" id="copyCmp" type="button">Copy caption</button></div>
+      </div>
+      <div class="status" id="statusCmp"></div>
+    </div>
+    <div class="preview" id="cmpPreview" hidden>
+      <div class="eyebrow">Head to head · square, sized for X<span class="touch-only"> · press and hold to save</span></div>
+      <div class="holo"><img id="cmpImg" alt="Comparison share image"></div>
     </div>
     <div class="preview" id="topPreview" hidden>
       <div class="eyebrow">Top list<span class="touch-only"> · press and hold to save</span></div>
@@ -1356,7 +1414,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791644181';
+(function(){ var BUILD='1791645217';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -1586,7 +1644,7 @@ function productArt(id, sealed){
     const src = e.img;
     src.onload = ()=>{
       if(sealed){ try{ e.img = trimToProduct(src); }catch(err){} }
-      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon(); if(!$('panel-tier').hidden) drawTierSoon(); if(!$('panel-psa').hidden) updatePsa();
+      e.ready = true; updateCheck(); updateLog(); if(!$('panel-show').hidden) updateShow(); if(!$('panel-top').hidden) drawTopSoon(); if(!$('panel-tier').hidden) drawTierSoon(); if(!$('panel-psa').hidden) updatePsa(); if(!$('panel-top').hidden && top.kind === 'vs') openCompare();
     };
     const fail = ()=>{ if(e.failed) return; e.failed = true; if(!$('panel-show').hidden) updateShow(); };
     src.onerror = fail;
@@ -3785,13 +3843,15 @@ updateShow();
 // ---------- top lists: most valuable in a set, biggest gainers / drops, most sold ----------
 let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: '', what: 'cards', stype: ''}, store.get('top1') || {});
 let topItems = [], topMeta = null, tTop;
-const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold'};
+const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold', vs: 'Head to head'};
 const STYPE = {'': 'All sealed', box: 'Booster boxes', etb: 'ETBs', bundle: 'Booster bundles', pack: 'Packs & blisters', collection: 'Collections & tins', poster: 'Posters & stickers', case: 'Cases'};
 function saveTop(){ store.set('top1', top); }
 function paintTopUI(){
   document.querySelectorAll('#topKinds .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.k===top.kind));
   const isSet = top.kind === 'set';
-  $('topSetStep').hidden = !isSet; $('topPerStep').hidden = isSet;
+  const isVs = top.kind === 'vs';
+  $('topSetStep').hidden = !isSet; $('topPerStep').hidden = isSet || isVs; $('cmpStep').hidden = !isVs; $('topCntStep').hidden = isVs;
+  $('cmpResult').hidden = !isVs; document.querySelector('#panel-top .col-out > .result:not(#cmpResult)').hidden = isVs; if(isVs) $('topPreview').hidden = true; else $('cmpPreview').hidden = true;
   $('topSetChosen').hidden = !(isSet && top.set); $('topSetSearch').hidden = !!(isSet && top.set);
   if(top.set){ $('topSetName').textContent = top.set.name; $('topSetSub').textContent = [top.set.date ? top.set.date.slice(0, 4) : '', LANGN[top.set.lang]].filter(Boolean).join(' · '); }
   $('per-week').setAttribute('aria-pressed', top.period==='week'); $('per-month').setAttribute('aria-pressed', top.period==='month');
@@ -3827,6 +3887,7 @@ async function findSets(){
 }
 async function openTop(){
   paintTopUI();
+  if(top.kind === 'vs'){ openCompare(); return; }
   if(top.kind === 'set' && (!top.set || top.set.game !== game)){ top.set = null; paintTopUI(); topItems = []; renderTop(); findSets(); return; }
   $('topEmpty').hidden = false; $('topEmpty').textContent = 'Getting today’s prices…'; $('topOut').hidden = true; $('topPreview').hidden = true;
   const want = top.n, url = top.kind === 'set' ? '/api/search?settop='+top.set.i+'&n='+want
@@ -4879,6 +4940,197 @@ async function loadPsaFeed(){
 }
 function openPsa(){ updatePsa(); if(!psaFeedLoaded) loadPsaFeed(); }
 holo($('psaPreview').querySelector('.holo'));
+
+// ---------- Compare two: any two products side by side (two ETBs, two boxes, a box vs an ETB, two packs) ----------
+const cmp = Object.assign({a: null, b: null, range: 'quarter'}, store.get('cmp1') || {});
+const CMP_COL = {a: '#A3E635', b: '#F4F4F5'};
+let tCmp = 0;
+function saveCmp(){ store.set('cmp1', cmp); }
+function cmpPick(slot){ return it=>{
+  cmp[slot] = {id: it.id, name: it.name, number: it.number || '', set: it.set, setDate: it.setDate || '', lang: it.cn ? 'cn' : it.jp ? 'jp' : 'en', variant: it.variant || '', kind: it.kind, packs: it.packs || null, usd: it.best, game: it.game || game};
+  saveCmp(); productArt(it.id, it.kind === 'sealed'); openCompare();
+}; }
+makeSearch($('cmpSearchA'), $('cmpResultsA'), 'any', cmpPick('a'));
+makeSearch($('cmpSearchB'), $('cmpResultsB'), 'any', cmpPick('b'));
+['a','b'].forEach(sl=>{ const S = sl.toUpperCase(); $('cmpClear'+S).addEventListener('click', ()=>{ cmp[sl] = null; saveCmp(); openCompare(); $('cmpSearch'+S).focus(); }); });
+$('cmpSwap').addEventListener('click', ()=>{ [cmp.a, cmp.b] = [cmp.b, cmp.a]; saveCmp(); openCompare(); });
+$('cmp-month').addEventListener('click', ()=>{ cmp.range = 'month'; saveCmp(); openCompare(); });
+$('cmp-quarter').addEventListener('click', ()=>{ cmp.range = 'quarter'; saveCmp(); openCompare(); });
+$('cmp-annual').addEventListener('click', ()=>{ cmp.range = 'annual'; saveCmp(); openCompare(); });
+const cmpLabel = it => it.name + (it.kind !== 'sealed' && it.number ? ' '+it.number : '');
+const cmpSub = it => [shortSet(it.set), it.variant, it.lang === 'jp' ? 'JP' : it.lang === 'cn' ? 'CN' : '', it.packs ? it.packs+' packs' : ''].filter(Boolean).join(' · ');
+function cmpData(it, range){
+  range = range || cmp.range; const key = it.id+'|'+range;
+  if(!showData.has(key) || (showData.get(key) && showData.get(key)._failed && !showData.get(key)._retried)){ const old = showData.get(key); showData.set(key, null);
+    fetch('/api/card?id='+it.id+'&r='+range).then(r=>r.ok ? r.json() : null).then(d=>{ showData.set(key, d && d.ok !== false ? d : {series:[], sales:[], _failed: true, _retried: !!old}); openCompare(); })
+      .catch(()=>{ showData.set(key, {series:[], sales:[], _failed: true, _retried: !!old}); openCompare(); }); }
+  return showData.get(key);
+}
+function cmpRefreshPrice(it){
+  // today's live price for exactly this printing (the saved pick may be a day old)
+  if(it._live) return; it._live = true;
+  fetch('/api/search?ids='+it.id).then(r=>r.json()).then(d=>{ const x = (d.results||[]).find(r=>(r.variant||'')===(it.variant||'')) || (d.results||[])[0]; if(x && x.best != null){ it.usd = x.best; if(x.packs) it.packs = x.packs; openCompare(); } }).catch(()=>{});
+}
+function cmpStats(it){
+  const dq = cmpData(it, 'quarter'), dy = cmpData(it, 'annual'), dc = cmp.range === 'quarter' ? dq : cmp.range === 'annual' ? dy : cmpData(it, 'month');
+  if(!dq || !dy || !dc) return {loading: true, now: it.usd};
+  const P = d => histPts(d, {lang: it.lang, variant: it.variant}).pts;
+  const q = P(dq), y = P(dy), pts = P(dc);
+  const now = it.usd != null ? it.usd : q.length ? q[q.length-1][1] : y.length ? y[y.length-1][1] : null;
+  const at = (src, days) => { const cut = new Date(Date.now() - days*864e5).toISOString().slice(0,10); let v = null; for(const p of src){ if(p[0] <= cut) v = p; else break; }
+    if(!v && src.length && (Date.parse(src[0][0]) - Date.parse(cut))/864e5 <= Math.max(2, days*0.06)) v = src[0]; return v; };
+  const ch = (src, days) => { const p = at(src, days); return p && now ? now/p[1] - 1 : null; };
+  // Since release: only when the product came out inside TCGplayer's one-year window, from its first real trading week.
+  const rel = it.setDate || '', yrAgo = new Date(Date.now() - 365*864e5).toISOString().slice(0,10);
+  let since = null;
+  if(rel && rel > yrAgo && rel <= todayISO() && y.length >= 2 && now){
+    const first = y[0], days = Math.max(1, (Date.now() - Date.parse(first[0]))/864e5);
+    since = {from: first[1], date: first[0], ch: now/first[1] - 1, perMonth: Math.pow(now/first[1], 30/days) - 1, days};
+  }
+  const ch1y = ch(y, 365);
+  // speed: average growth per month over the longest real stretch we have (since release, else one year)
+  let perMonth = since ? since.perMonth : null;
+  if(perMonth == null && y.length >= 2 && now){ const f = at(y, 365) || y[0], days = Math.max(1, (Date.now() - Date.parse(f[0]))/864e5); perMonth = Math.pow(now/f[1], 30/days) - 1; }
+  const soldOf = src => src.reduce((s, p)=>s + (p[2] || 0), 0);
+  return {now, pts, ch7: ch(q, 7), ch30: ch(q, 30), ch90: ch(q, 90), ch1y, since, perMonth, sold: soldOf(pts), sold90: soldOf(q), perPack: it.packs && now ? now/it.packs : null};
+}
+function openCompare(){
+  ['a','b'].forEach(sl=>{ const S = sl.toUpperCase(), it = cmp[sl];
+    $('cmpChosen'+S).hidden = !it; $('cmpSearch'+S).hidden = !!it;
+    const bar = $('cmpSearch'+S).nextElementSibling; if(bar && bar.classList.contains('langs')) bar.hidden = !!it;
+    if(it){ $('cmpName'+S).textContent = cmpLabel(it); $('cmpSub'+S).textContent = cmpSub(it); cmpRefreshPrice(it); } });
+  $('cmp-month').setAttribute('aria-pressed', cmp.range === 'month'); $('cmp-quarter').setAttribute('aria-pressed', cmp.range === 'quarter'); $('cmp-annual').setAttribute('aria-pressed', cmp.range === 'annual');
+  const ready = cmp.a && cmp.b;
+  $('cmpEmpty').hidden = !!ready; $('cmpOut').hidden = !ready; if(!ready){ $('cmpPreview').hidden = true; return; }
+  const A = cmpStats(cmp.a), B = cmpStats(cmp.b);
+  const m = v => v == null ? '—' : money(fromUsd(v), fromUsd(v) >= 1000 ? 0 : 2), pc = v => v == null ? '—' : (v >= 0 ? '▲ ' : '▼ ')+Math.abs(v*100).toFixed(1)+'%';
+  // verdict
+  const v = $('cmpVerdict'); v.textContent = '';
+  const nm = sl => shortName(cmp[sl]);
+  if(A.now != null && B.now != null){
+    const cheap = A.now <= B.now ? 'a' : 'b', d = Math.abs(A.now - B.now), rel = d / Math.max(A.now, B.now);
+    if(d < 0.005) v.append('Same price today: ', bold(m(A.now)), ' each.');
+    else v.append(bold(nm(cheap)), ' is ', bold(m(d)), ' cheaper ('+Math.round(rel*100)+'%).');
+    if(A.perPack != null && B.perPack != null && Math.abs(A.perPack - B.perPack) >= 0.005){
+      const pp = A.perPack <= B.perPack ? 'a' : 'b'; v.append(' Per pack, ', bold(nm(pp)), ' wins at ', bold(m(Math.min(A.perPack, B.perPack))), ' vs '+m(Math.max(A.perPack, B.perPack))+'.'); }
+  }
+  const race = (lab, a, b)=>{ if(a == null || b == null) return; const w = a >= b ? 'a' : 'b', lo = w === 'a' ? b : a, hi = w === 'a' ? a : b;
+    const line = document.createElement('div'); line.className = 'cmprace'; line.append(lab+': ', bold(nm(w)), ' '+pct(hi)+' vs '+pct(lo)+'.'); v.append(line); };
+  if(!A.loading && !B.loading){
+    race('Short term (30 days)', A.ch30, B.ch30);
+    if(A.since && B.since) race('Since release', A.since.ch, B.since.ch); else race('Long run (1 year)', A.ch1y, B.ch1y);
+    if(A.perMonth != null && B.perMonth != null){ const w = A.perMonth >= B.perMonth ? 'a' : 'b'; const line = document.createElement('div'); line.className = 'cmprace';
+      line.append('Growing faster: ', bold(nm(w)), ', '+pct(Math.max(A.perMonth, B.perMonth))+' a month on average vs '+pct(Math.min(A.perMonth, B.perMonth))+'.'); v.append(line); }
+  }
+  // table
+  const rows = [['Price today', A.now, B.now, m, 'low'], ['Per pack', A.perPack, B.perPack, m, 'low'], ['7 days', A.ch7, B.ch7, pc, 'high'], ['30 days', A.ch30, B.ch30, pc, 'high'], ['90 days', A.ch90, B.ch90, pc, 'high'], ['1 year', A.ch1y, B.ch1y, pc, 'high']];
+  if(A.since || B.since) rows.push(['Since release', A.since && A.since.ch, B.since && B.since.ch, pc, 'high']);
+  rows.push(['Per month (avg)', A.perMonth, B.perMonth, pc, 'high']);
+  rows.push(['Sold (90 days)', A.loading ? null : A.sold90, B.loading ? null : B.sold90, x=>x == null ? '…' : x.toLocaleString('en-US'), 'high']);
+  const t = $('cmpTable'); t.textContent = '';
+  const hd = document.createElement('thead'), hr = document.createElement('tr'); hr.innerHTML = '<th></th><th><span style="background:'+CMP_COL.a+'">A</span></th><th><span style="background:'+CMP_COL.b+'">B</span></th>'; hd.append(hr); t.append(hd);
+  const tb = document.createElement('tbody');
+  rows.forEach(([lab, a, b, f, better])=>{ if(a == null && b == null && lab === 'Per pack') return;
+    const tr = document.createElement('tr'), th = document.createElement('th'); th.textContent = lab; tr.append(th);
+    const win = a != null && b != null && a !== b ? ((better === 'low') === (a < b) ? 'a' : 'b') : '';
+    const isChg = !lab.startsWith('Sold') && /days|year|release|month/.test(lab);
+    [['a', a], ['b', b]].forEach(([sl, x])=>{ const td = document.createElement('td'); td.textContent = (A.loading && sl==='a' || B.loading && sl==='b') && lab !== 'Price today' ? '…' : f(x);
+      if(win === sl && !lab.startsWith('Sold')) td.className = 'win';
+      if(isChg && x != null){ td.style.color = x >= 0 ? C.win : C.loss; if(win === sl) td.append(Object.assign(document.createElement('small'), {textContent: '★ better'})); }
+      if(lab === 'Since release' && x != null){ const st = sl === 'a' ? A.since : B.since; if(st) td.append(Object.assign(document.createElement('small'), {textContent: 'from '+m(st.from)+' · '+shortDate(st.date)})); }
+      tr.append(td); });
+    tb.append(tr); });
+  t.append(tb);
+  $('cmpNote').textContent = 'Today’s TCGplayer market price'+(cmp.a.kind === 'sealed' || cmp.b.kind === 'sealed' ? ' (unopened for sealed, near mint for cards)' : ' (near mint)')+'. Changes are vs that many days ago. Since release starts at its first full week of sales (only for things out less than a year; TCGplayer keeps one year of history). Per month is the average monthly growth over that time. Per pack uses the real pack count.';
+  clearTimeout(tCmp); tCmp = setTimeout(()=>{ const cv = drawCompare(A, B); if(cv){ $('cmpImg').src = cv.toDataURL('image/jpeg', 0.9); $('cmpPreview').hidden = false; } else setTimeout(openCompare, 300); }, 150);
+  function bold(s){ const b = document.createElement('b'); b.textContent = s; return b; }
+  function pct(x){ return (x >= 0 ? '+' : '−')+Math.abs(x*100).toFixed(Math.abs(x) >= 1 ? 0 : 1)+'%'; }
+}
+function shortName(it){
+  let s = (it.name || '').replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/Pokemon Center Elite Trainer Box/i, 'PC ETB').replace(/Elite Trainer Box/i, 'ETB').replace(/Booster Bundle/i, 'Bundle').replace(/Booster Box/i, 'Box').replace(/Booster Pack/i, 'Pack').replace(/\s+/g, ' ').trim();
+  return s + (it.kind !== 'sealed' && it.number ? ' '+String(it.number).split('/')[0] : '');
+}
+function drawCompare(A, B){
+  if(!bcFonts()) return null;
+  const W = 1080, H = 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), rnd = bcRand(((cmp.a.id % 9973) * 31 + cmp.b.id % 9973) % 100000 + 5), INK = '#F4F4F5', soft = 'rgba(244,244,245,.62)', faint = 'rgba(244,244,245,.4)', LIME = CMP_COL.a, WHITE = CMP_COL.b;
+  ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, W, H);
+  const glow = (x, col)=>{ const g = ctx.createRadialGradient(x, 230, 10, x, 230, 400); g.addColorStop(0, hexA(col, .14)); g.addColorStop(1, hexA(col, 0)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); };
+  glow(270, LIME); glow(810, WHITE);
+  // header
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  if(brandIcon.complete && brandIcon.naturalWidth) ctx.drawImage(brandIcon, 44, 30, 48, 48);
+  ctx.font = '400 28px Anton'; spaced(ctx, 3); ctx.fillStyle = INK; ctx.fillText('BREAK CHECK', 104, 62); spaced(ctx, 0);
+  ctx.font = '700 12px "JetBrains Mono"'; spaced(ctx, 4); ctx.fillStyle = LIME; ctx.fillText('HEAD TO HEAD', 106, 80); spaced(ctx, 0);
+  if(creatorOn()) drawCreator(ctx, W - 44, 32, 44, {align: 'right', font: '700 21px Archivo', ring: LIME});
+  // pictures
+  const pic = (it, cx, col)=>{ const sealed = it.kind === 'sealed', a = productArt(it.id, sealed); const PW = 360, PH = 230, X = cx - PW/2, Y = 104;
+    if(!a){ rrect(ctx, X + 60, Y, PW - 120, PH, 16); ctx.fillStyle = '#121214'; ctx.fill(); return; }
+    const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(PW/iw, PH/ih), w = iw*k, h = ih*k, x = cx - w/2, y = Y + (PH - h)/2;
+    ctx.save(); ctx.shadowColor = hexA(col, .35); ctx.shadowBlur = 60; ctx.shadowOffsetY = 10; if(!sealed){ rrect(ctx, x, y, w, h, w*0.045); ctx.fillStyle = '#000'; ctx.fill(); } ctx.drawImage(im, x, y, w, h); ctx.restore(); };
+  pic(cmp.a, 270, LIME); pic(cmp.b, 810, WHITE);
+  // VS
+  ctx.save(); ctx.beginPath(); ctx.arc(540, 220, 44, 0, Math.PI*2); ctx.fillStyle = '#030303'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(244,244,245,.25)'; ctx.stroke();
+  ctx.font = '400 40px Anton'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = INK; ctx.fillText('VS', 540, 222); ctx.restore();
+  // names + prices
+  const label = (it, st, cx, col, other)=>{
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '400 15px Anton'; spaced(ctx, 3); ctx.fillStyle = col; ctx.fillText(it === cmp.a ? 'A' : 'B', cx, 368); spaced(ctx, 0);
+    const nmT = shortName(it); fit(ctx, nmT, '800 {s}px Archivo', 28, 460); ctx.fillStyle = INK; const lines = [clip(ctx, nmT, 460)]; ctx.fillText(lines[0], cx, 400);
+    ctx.font = '600 13px "JetBrains Mono"'; spaced(ctx, 1.5); ctx.fillStyle = soft; ctx.fillText(clip(ctx, cmpSub(it).toUpperCase(), 440), cx, 400 + lines.length*30 + 2); spaced(ctx, 0);
+    const v = st.now; const win = v != null && other.now != null && v < other.now;
+    const t = v == null ? '—' : money(fromUsd(v), fromUsd(v) >= 100 ? 0 : 2);
+    const fs = fit(ctx, t, '400 {s}px Anton', 80, 440); ctx.save(); ctx.fillStyle = win ? LIME : INK; if(win){ ctx.shadowColor = hexA(LIME, .45); ctx.shadowBlur = 30; } ctx.fillText(t, cx, 536); ctx.restore();
+    if(win){ ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = LIME; ctx.fillText('CHEAPER', cx, 558); spaced(ctx, 0); }
+  };
+  label(cmp.a, A, 270, LIME, B); label(cmp.b, B, 810, WHITE, A);
+  // stat rows
+  const pc = v => v == null ? '—' : (v >= 0 ? '▲' : '▼')+Math.abs(v*100).toFixed(1)+'%', mm = v => v == null ? '—' : money(fromUsd(v), 2);
+  const rows = [];
+  if(A.perPack != null || B.perPack != null) rows.push(['PER PACK', A.perPack, B.perPack, mm, 'low']);
+  rows.push(['7 DAYS', A.ch7, B.ch7, pc, 'chg'], ['30 DAYS', A.ch30, B.ch30, pc, 'chg'], ['90 DAYS', A.ch90, B.ch90, pc, 'chg']);
+  if(A.since && B.since) rows.push(['SINCE RELEASE', A.since.ch, B.since.ch, pc, 'chg']); else rows.push(['1 YEAR', A.ch1y, B.ch1y, pc, 'chg']);
+  rows.push(['PER MONTH', A.perMonth, B.perMonth, pc, 'chg']);
+  // chart: both price lines on one scale (chosen range)
+  { const cy0 = 596, cy1 = 742, cx0 = 92, cx1 = W - 44;
+    if(A.pts && B.pts && (A.pts.length > 1 || B.pts.length > 1)){
+      const all = [...A.pts, ...B.pts].map(p=>p[1]); let lo = Math.min(...all), hi = Math.max(...all); const sp = (hi - lo) || hi*0.1 || 1; lo = Math.max(0, lo - sp*0.12); hi += sp*0.12;
+      const d0 = Math.min(...[A.pts[0], B.pts[0]].filter(Boolean).map(p=>Date.parse(p[0]))), d1 = Date.now();
+      const X = d => cx0 + (Date.parse(d) - d0)/Math.max(1, d1 - d0)*(cx1 - cx0), Y = v => cy1 - (v - lo)/(hi - lo)*(cy1 - cy0);
+      ctx.font = '600 12px "JetBrains Mono"'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      for(let k=0;k<3;k++){ const v = lo + (hi - lo)*k/2, yy = Y(v); ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(cx0, Math.round(yy), cx1 - cx0, 1); ctx.fillStyle = faint; ctx.fillText(compactMoney(fromUsd(v)), cx0 - 10, yy); }
+      [[B, WHITE], [A, LIME]].forEach(([st, col])=>{ if(st.pts.length < 2) return; const P = st.pts.map(p=>[X(p[0]), Y(p[1])]);
+        ctx.save(); ctx.beginPath(); monoPath(ctx, P); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.shadowColor = hexA(col, .5); ctx.shadowBlur = 12; ctx.stroke(); ctx.restore();
+        const e = P[P.length-1]; ctx.beginPath(); ctx.arc(e[0], e[1], 7, 0, Math.PI*2); ctx.fillStyle = col; ctx.fill(); });
+    } else { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '500 16px Archivo'; ctx.fillStyle = faint; ctx.fillText(A.loading || B.loading ? 'Loading price history…' : 'Not enough sales history to chart.', 540, (cy0 + cy1)/2); }
+  }
+  let y = 772; const rh = 36;
+  ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(44, y - 10, W - 88, 1);
+  rows.forEach(([lab, a, b, f, kind])=>{
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.font = '700 13px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint; ctx.fillText(lab, 540, y + rh/2 - 6); spaced(ctx, 0);
+    const winA = a != null && b != null && (kind === 'low' ? a < b - 0.004 : a > b + 0.0004), winB = a != null && b != null && (kind === 'low' ? b < a - 0.004 : b > a + 0.0004);
+    if(kind === 'chg'){ [[winA, 270], [winB, 810]].forEach(([w, cx])=>{ if(w){ ctx.save(); ctx.font = '700 15px Archivo'; ctx.fillStyle = '#F5C84C'; ctx.textAlign = 'center'; ctx.fillText('★', cx + 92, y + rh/2 - 7); ctx.restore(); } }); }
+    const val = (x, cx, win)=>{ ctx.font = '800 24px "Barlow Semi Condensed"'; ctx.fillStyle = kind === 'chg' && x != null ? (x >= 0 ? LIME : '#F0435A') : win ? LIME : x == null ? faint : INK; ctx.fillText(f(x), cx, y + rh/2 - 6); };
+    val(a, 270, winA); val(b, 810, winB);
+    y += rh; ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(44, y - 10, W - 88, 1);
+  });
+  // footer
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; ctx.font = '600 12px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
+  ctx.fillText(('TCGPLAYER MARKET · CHART '+(cmp.range === 'month' ? '30 DAYS' : cmp.range === 'annual' ? '1 YEAR' : '90 DAYS')+' · '+cur+' · '+today).toUpperCase(), 44, H - 34);
+  ctx.textAlign = 'right'; ctx.fillText('POKESNIPR.COM', W - 44, H - 34); ctx.textAlign = 'left'; spaced(ctx, 0);
+  grainVignette(ctx, rnd, .02, .3);
+  return cv;
+}
+$('saveCmp').addEventListener('click', ()=>{ if(!cmp.a || !cmp.b) return; const cv = drawCompare(cmpStats(cmp.a), cmpStats(cmp.b)); if(cv) save(cv, 'break-check-compare.png', $('statusCmp')); });
+$('copyCmp').addEventListener('click', ()=>{
+  if(!cmp.a || !cmp.b) return; const A = cmpStats(cmp.a), B = cmpStats(cmp.b); if(A.now == null || B.now == null) return;
+  const cheap = A.now <= B.now ? cmp.a : cmp.b, d = Math.abs(A.now - B.now);
+  let cap = shortName(cmp.a)+' ('+money(fromUsd(A.now), 0)+') vs '+shortName(cmp.b)+' ('+money(fromUsd(B.now), 0)+'). '+(d >= 0.005 ? shortName(cheap)+' is '+money(fromUsd(d), 0)+' cheaper' : 'Same price');
+  if(A.perPack != null && B.perPack != null) cap += ', '+money(fromUsd(A.perPack))+' vs '+money(fromUsd(B.perPack))+' a pack';
+  cap += '. '+cur+' #breakcheck';
+  try{ navigator.clipboard.writeText(cap).then(()=>{ $('statusCmp').textContent = 'Caption copied.'; }, ()=>{ $('statusCmp').textContent = cap; }); }catch(e){ $('statusCmp').textContent = cap; }
+});
+holo($('cmpPreview').querySelector('.holo'));
 
 // ---------- restore + boot ----------
 const sc = store.get('check3');
