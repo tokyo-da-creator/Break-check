@@ -2963,17 +2963,29 @@ let wmAll = Object.assign({on: true, color: '#A3E635', op: 14}, store.get('wm1')
 function setWm(ch){ wmAll = Object.assign({}, wmAll, ch); store.set('wm1', wmAll); paintCreator(); redrawAllCards(); }
 function redrawAllCards(){ try{ updateCheck(); updateLog(); updateShow(); }catch(e){} if(!$('panel-tier').hidden) drawTierSoon(); if(!$('panel-top').hidden){ if(top.kind === 'vs') openCompare(); else drawTopSoon(); } if(!$('panel-psa').hidden) updatePsa(); }
 function wmActive(){ return !!(wmAll.on && creatorOn()); }
-function stampWatermark(cv){
-  if(!cv || cv._wm || !wmActive()) return cv; cv._wm = true;
-  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, txt = '@'+creator.handle, col = wmAll.color, al = wmAll.op/100, sc = Math.max(W, H)/1200;
-  ctx.save(); ctx.font = '800 '+Math.round(34*sc)+'px Archivo'; spaced(ctx, 1); const tw = ctx.measureText(txt).width, sx = tw + 120*sc, sy = 150*sc;
+// Tiles your @handle and the site's mark in a checkerboard on the diagonal, so every image carries both
+// and a crop can't lose either.
+function tileMark(ctx, W, H, txt, col, al, sc){
+  const SITE = 'POKESNIPR.COM', fUser = '800 '+Math.round(34*sc)+'px Archivo', fSite = '700 '+Math.round(22*sc)+'px "JetBrains Mono"';
+  ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.font = fUser; spaced(ctx, 1); const tu = ctx.measureText(txt).width;
+  ctx.font = fSite; spaced(ctx, 4); const ts = ctx.measureText(SITE).width;
+  const sx = Math.max(tu, ts) + 110*sc, sy = 120*sc;
   ctx.translate(W/2, H/2); ctx.rotate(-Math.PI/7);
   const R = Math.hypot(W, H)/2 + sx;
-  for(let yy = -R, row = 0; yy < R; yy += sy, row++) for(let xx = -R + (row % 2 ? sx/2 : 0); xx < R; xx += sx){
-    ctx.globalAlpha = al*0.9; ctx.lineWidth = 3*sc; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(txt, xx, yy);
-    ctx.globalAlpha = al; ctx.fillStyle = col; ctx.fillText(txt, xx, yy);
+  for(let yy = -R, row = 0; yy < R; yy += sy, row++) for(let xx = -R + (row % 2 ? sx/2 : 0), k = 0; xx < R; xx += sx, k++){
+    const site = (row + k) % 2 === 1, t = site ? SITE : txt;
+    if(site){ ctx.font = fSite; spaced(ctx, 4); } else { ctx.font = fUser; spaced(ctx, 1); }
+    ctx.globalAlpha = al*0.9; ctx.lineWidth = 3*sc; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(t, xx, yy);
+    ctx.globalAlpha = site ? al*0.85 : al; ctx.fillStyle = col; ctx.fillText(t, xx, yy);
   }
-  ctx.restore(); return cv;
+  spaced(ctx, 0); ctx.restore();
+}
+function stampWatermark(cv){
+  if(!cv || cv._wm || !wmActive()) return cv; cv._wm = true;
+  const W = cv.width, H = cv.height;
+  tileMark(cv.getContext('2d'), W, H, '@'+creator.handle, wmAll.color, wmAll.op/100, Math.max(W, H)/1200);
+  return cv;
 }
 function setCreator(c){
   creator = c; store.set('creator', c);
@@ -2999,7 +3011,7 @@ function paintCreator(){
       const wsw = document.createElement('label'); wsw.className = 'sw';
       const wcb = document.createElement('input'); wcb.type = 'checkbox'; wcb.checked = !!wmAll.on;
       wcb.addEventListener('change', ()=>setWm({on: wcb.checked}));
-      wsw.append(wcb, document.createTextNode('Watermark every image'));
+      wsw.append(wcb, document.createTextNode('Watermark: @'+creator.handle+' + pokesnipr.com'));
       wr.append(wsw);
       if(wmAll.on){
         const sws = document.createElement('div'); sws.className = 'swatches';
@@ -3011,7 +3023,7 @@ function paintCreator(){
       box.append(wr);
       return;
     }
-    const t = document.createElement('div'); t.innerHTML = '<div class="ttl">Put your X on your cards</div><div class="sub">Your profile picture and @username go on the card, receipt and banner.</div>';
+    const t = document.createElement('div'); t.innerHTML = '<div class="ttl">Put your X on your cards</div><div class="sub">Your profile picture and @username go on every card, plus a watermark of your @ and pokesnipr.com across the image so reposts still lead back to you.</div>';
     const at = document.createElement('label'); at.className = 'at';
     const pre = document.createElement('span'); pre.textContent = '@';
     const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'username'; inp.autocomplete = 'off'; inp.autocapitalize = 'off'; inp.spellcheck = false; inp.maxLength = 16; inp.setAttribute('aria-label', 'Your X username');
@@ -3824,15 +3836,7 @@ function drawTierList(T){
   // watermark: your @handle tiled on the diagonal over everything, so a crop can't lose it
   const wm = T.watermark;
   if(wm && wm.on && (wm.text || creatorOn())){
-    const txt = wm.text || '@'+creator.handle, col = wm.color || LIME, al = wm.opacity != null ? wm.opacity : .16;
-    ctx.save(); ctx.font = '800 34px Archivo'; spaced(ctx, 1); const tw = ctx.measureText(txt).width, sx = tw + 120, sy = 150;
-    ctx.translate(W/2, H/2); ctx.rotate(-Math.PI/7);
-    const R = Math.hypot(W, H)/2 + sx;
-    for(let yy = -R, row = 0; yy < R; yy += sy, row++) for(let xx = -R + (row % 2 ? sx/2 : 0); xx < R; xx += sx){
-      ctx.globalAlpha = al*0.9; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(txt, xx, yy);
-      ctx.globalAlpha = al; ctx.fillStyle = col; ctx.fillText(txt, xx, yy);
-    }
-    ctx.restore();
+    tileMark(ctx, W, H, wm.text || '@'+creator.handle, wm.color || LIME, wm.opacity != null ? wm.opacity : .16, 1);
   }
   grainVignette(ctx, rnd, .02, .4);
   return cv;
