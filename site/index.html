@@ -2110,7 +2110,11 @@ function cutoutCore(img, mode){
       if(leak) px.forEach(i=>{ M[i] = 1; });   // a leak into the product: fill it back
     }
   }
-  // a closed box is its outline (anti-aliased), less any crisp gap that really is background
+  // A closed box with no real gaps: draw it straight from its outline at full size. If the photo's frame
+  // chopped a corner off (TCGplayer crops some boxes tight), run the two box edges on to where they meet and
+  // fill the sliver by carrying the photo's last row/column of pixels out to it, so the corner is whole again.
+  if(mode === 'box'){ let gaps = 0; for(let i = 0; i < N; i++) if(H[i] && !M[i]){ gaps = 1; break; }
+    if(!gaps) return boxFromOutline(img, hull, w, h, W0, H0, k); }
   let Mf, nearGap = null;
   if(mode === 'box'){ Mf = new Uint8Array(N); const gap = new Uint8Array(N); for(let i = 0; i < N; i++){ Mf[i] = hd[i*4+3] && (M[i] || !H[i]) ? 1 : 0; if(H[i] && !M[i]) gap[i] = 1; } nearGap = dilate(gap, 2); }
   else Mf = keepBig(dilate(erode(M)));
@@ -2132,6 +2136,59 @@ function cutoutCore(img, mode){
   const ox0 = Math.max(0, Math.floor(L0*f)), oy0 = Math.max(0, Math.floor(T0*f)), ow = Math.min(FW, Math.ceil((R0+1)*f)) - ox0, oh = Math.min(FH, Math.ceil((B0+1)*f)) - oy0;
   const o = document.createElement('canvas'); o.width = ow; o.height = oh;
   o.getContext('2d').drawImage(full, ox0, oy0, ow, oh, 0, 0, ow, oh);
+  return o;
+}
+// A closed box, cut straight from its outline at full size. When the photo's frame chopped a corner off
+// (TCGplayer crops some boxes tight), the two box edges either side are run on to where they meet and the sliver
+// is filled by carrying the photo's last row/column of pixels out to it, so the corner comes back whole.
+function boxFromOutline(img, hull, w, h, W0, H0, k){
+  let poly = hull.map(q=>[q[0], q[1]]);
+  const lim = Math.max(w, h)*0.08, dist = (a, b)=>Math.hypot(a[0]-b[0], a[1]-b[1]);
+  const onSide = (q, s)=> s === 'b' ? q[1] >= h - 0.5 : s === 't' ? q[1] <= 0.5 : s === 'l' ? q[0] <= 0.5 : q[0] >= w - 0.5;
+  for(const side of ['b', 't', 'l', 'r']){
+    const m = poly.length; if(m < 4) break;
+    let s0 = -1;
+    for(let i = 0; i < m; i++){ const a = poly[i], b = poly[(i+1)%m]; if(onSide(a, side) && onSide(b, side) && dist(a, b) > 2){ s0 = i; break; } }
+    if(s0 < 0) continue;
+    let a0 = s0, b0 = (s0+1)%m, guard = 0;
+    while(onSide(poly[(a0-1+m)%m], side) && guard++ < m) a0 = (a0-1+m)%m;
+    guard = 0; while(onSide(poly[(b0+1)%m], side) && guard++ < m) b0 = (b0+1)%m;
+    let pa = (a0-1+m)%m; guard = 0; while(dist(poly[pa], poly[a0]) < 15 && guard++ < m) pa = (pa-1+m)%m;
+    let pb = (b0+1)%m; guard = 0; while(dist(poly[pb], poly[b0]) < 15 && guard++ < m) pb = (pb+1)%m;
+    const A = poly[pa], B = poly[a0], C = poly[b0], D = poly[pb];
+    const d1 = [B[0]-A[0], B[1]-A[1]], d2 = [C[0]-D[0], C[1]-D[1]], den = d1[0]*d2[1] - d1[1]*d2[0];
+    if(Math.abs(den) < 1e-6) continue;
+    const t = ((C[0]-A[0])*d2[1] - (C[1]-A[1])*d2[0])/den, X = [A[0] + d1[0]*t, A[1] + d1[1]*t];
+    const out = side === 'b' ? X[1] - h : side === 't' ? -X[1] : side === 'l' ? -X[0] : X[0] - w;
+    if(!(out > 0.5 && out <= lim)) continue;
+    const next = [X]; for(let i = (b0+1)%m; i !== a0; i = (i+1)%m) next.push(poly[i]);
+    poly = next;
+  }
+  // pull the outline in by ~1.5px so the backdrop's anti-aliased rim doesn't show as a thin white line
+  { let cx = 0, cy = 0; poly.forEach(([a, b])=>{ cx += a; cy += b; }); cx /= poly.length; cy /= poly.length;
+    poly = poly.map(([a, b])=>{ const r = Math.hypot(a - cx, b - cy) || 1, q = Math.max(0, r - 1)/r; return [cx + (a - cx)*q, cy + (b - cy)*q]; }); }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  poly.forEach(([a, b])=>{ x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, a); y1 = Math.max(y1, b); });
+  const S = k > 1 ? k : Math.min(1, 1000/Math.max(W0, H0)), FW = Math.round(W0*S), FH = Math.round(H0*S), f = FW/w;
+  const pl = Math.max(0, Math.ceil(-x0*f)), pt = Math.max(0, Math.ceil(-y0*f)), pr = Math.max(0, Math.ceil((x1 - w)*f)), pb = Math.max(0, Math.ceil((y1 - h)*f));
+  const full = document.createElement('canvas'); full.width = FW + pl + pr; full.height = FH + pt + pb; const fx = full.getContext('2d');
+  fx.imageSmoothingQuality = 'high'; fx.drawImage(img, pl, pt, FW, FH);
+  if(pb) fx.drawImage(img, 0, H0 - 1, W0, 1, pl, pt + FH, FW, pb);
+  if(pt) fx.drawImage(img, 0, 0, W0, 1, pl, 0, FW, pt);
+  if(pl) fx.drawImage(img, 0, 0, 1, H0, 0, pt, pl, FH);
+  if(pr) fx.drawImage(img, W0 - 1, 0, 1, H0, pl + FW, pt, pr, FH);
+  fx.globalCompositeOperation = 'destination-in'; fx.beginPath();
+  poly.forEach(([a, b], i)=>{ const X = a*f + pl, Y = b*f + pt; i ? fx.lineTo(X, Y) : fx.moveTo(X, Y); }); fx.closePath(); fx.fillStyle = '#000'; fx.fill();
+  // along the edge only, fade out pixels that are still backdrop-white (the photo's anti-aliased rim)
+  { const band = document.createElement('canvas'); band.width = full.width; band.height = full.height; const bx2 = band.getContext('2d');
+    bx2.beginPath(); poly.forEach(([a, b], i)=>{ const X = a*f + pl, Y = b*f + pt; i ? bx2.lineTo(X, Y) : bx2.moveTo(X, Y); }); bx2.closePath();
+    bx2.lineWidth = Math.max(3, f*3); bx2.strokeStyle = '#000'; bx2.stroke();
+    const bd = bx2.getImageData(0, 0, band.width, band.height).data, id2 = fx.getImageData(0, 0, full.width, full.height), q = id2.data;
+    for(let i = 0; i < bd.length; i += 4) if(bd[i+3] && q[i+3]){ const dd = Math.max(255 - q[i], 255 - q[i+1], 255 - q[i+2]); if(dd < 30) q[i+3] = Math.round(q[i+3]*dd/30); }
+    fx.putImageData(id2, 0, 0); }
+  const bx = Math.max(0, Math.floor(x0*f + pl)), by = Math.max(0, Math.floor(y0*f + pt)), bw = Math.min(full.width, Math.ceil(x1*f + pl)) - bx, bh = Math.min(full.height, Math.ceil(y1*f + pt)) - by;
+  if(bw < 4 || bh < 4) return null;
+  const o = document.createElement('canvas'); o.width = bw; o.height = bh; o.getContext('2d').drawImage(full, bx, by, bw, bh, 0, 0, bw, bh);
   return o;
 }
 // The item being checked, resting on the pack: the box if one was picked, otherwise the hits fanned out.
