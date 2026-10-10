@@ -423,6 +423,8 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 .sales .s{display:flex;justify-content:space-between;gap:10px;font:500 13px var(--mono);color:var(--muted);border-bottom:1px dashed var(--line-soft);padding:6px 0}
 .sales .s b{color:var(--fg);font-weight:700}
 #showWhere .chip[aria-pressed="true"]{background:var(--fg);color:var(--ink);border-color:var(--fg)}
+#topWhat{margin-bottom:2px}
+#topTypes .chip{min-height:38px;padding:6px 12px;font-size:13px}
 /* your X on the cards */
 .creator{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
 .creator .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -761,6 +763,17 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
     <div class="step" id="topPerStep" hidden>
       <div class="stephead"><span class="num">2</span>Over what time?</div>
       <div class="seg" role="group" aria-label="Period"><button id="per-week" type="button" aria-pressed="true">This week</button><button id="per-month" type="button" aria-pressed="false">This month</button></div>
+      <div class="seg" id="topWhat" role="group" aria-label="Cards or sealed"><button type="button" data-w="cards" aria-pressed="true">Cards</button><button type="button" data-w="sealed" aria-pressed="false">Sealed</button></div>
+      <div class="chips toplists" id="topTypes" role="group" aria-label="Sealed type" hidden>
+        <button class="chip" type="button" data-t="" aria-pressed="true">All sealed</button>
+        <button class="chip" type="button" data-t="box">Booster boxes</button>
+        <button class="chip" type="button" data-t="etb">ETBs</button>
+        <button class="chip" type="button" data-t="bundle">Bundles</button>
+        <button class="chip" type="button" data-t="pack">Packs &amp; blisters</button>
+        <button class="chip" type="button" data-t="collection">Collections &amp; tins</button>
+        <button class="chip" type="button" data-t="poster">Posters &amp; stickers</button>
+        <button class="chip" type="button" data-t="case">Cases</button>
+      </div>
       <div class="seg slim" id="topLang" role="group" aria-label="Language" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-l="" aria-pressed="true">All</button><button type="button" data-l="en" aria-pressed="false">English</button><button type="button" data-l="jp" aria-pressed="false">Japanese</button></div>
     </div>
     <div class="step">
@@ -3429,9 +3442,10 @@ $('copyShow').addEventListener('click', ()=>{
 updateShow();
 
 // ---------- top lists: most valuable in a set, biggest gainers / drops, most sold ----------
-let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: ''}, store.get('top1') || {});
+let top = Object.assign({kind: 'set', set: null, period: 'week', n: 20, lang: '', what: 'cards', stype: ''}, store.get('top1') || {});
 let topItems = [], topMeta = null, tTop;
 const KINDS = {set: 'Most valuable', gain: 'Biggest gainers', drop: 'Biggest drops', sold: 'Most sold'};
+const STYPE = {'': 'All sealed', box: 'Booster boxes', etb: 'ETBs', bundle: 'Booster bundles', pack: 'Packs & blisters', collection: 'Collections & tins', poster: 'Posters & stickers', case: 'Cases'};
 function saveTop(){ store.set('top1', top); }
 function paintTopUI(){
   document.querySelectorAll('#topKinds .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.k===top.kind));
@@ -3442,6 +3456,9 @@ function paintTopUI(){
   $('per-week').setAttribute('aria-pressed', top.period==='week'); $('per-month').setAttribute('aria-pressed', top.period==='month');
   $('cnt-10').setAttribute('aria-pressed', top.n===10); $('cnt-20').setAttribute('aria-pressed', top.n===20);
   document.querySelectorAll('#topLang button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l===top.lang));
+  document.querySelectorAll('#topWhat button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.w===top.what));
+  document.querySelectorAll('#topTypes .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.t===top.stype));
+  $('topTypes').hidden = top.what !== 'sealed';
 }
 document.querySelectorAll('#topKinds .chip').forEach(b=>b.addEventListener('click', ()=>{ top.kind = b.dataset.k; saveTop(); openTop(); }));
 $('per-week').addEventListener('click', ()=>{ top.period = 'week'; saveTop(); openTop(); });
@@ -3449,6 +3466,8 @@ $('per-month').addEventListener('click', ()=>{ top.period = 'month'; saveTop(); 
 $('cnt-10').addEventListener('click', ()=>{ top.n = 10; saveTop(); openTop(); });
 $('cnt-20').addEventListener('click', ()=>{ top.n = 20; saveTop(); openTop(); });
 document.querySelectorAll('#topLang button').forEach(b=>b.addEventListener('click', ()=>{ top.lang = b.dataset.l; saveTop(); openTop(); }));
+document.querySelectorAll('#topWhat button').forEach(b=>b.addEventListener('click', ()=>{ top.what = b.dataset.w; saveTop(); openTop(); }));
+document.querySelectorAll('#topTypes .chip').forEach(b=>b.addEventListener('click', ()=>{ top.stype = b.dataset.t; saveTop(); openTop(); }));
 $('topSetClear').addEventListener('click', ()=>{ top.set = null; saveTop(); paintTopUI(); topItems = []; renderTop(); findSets(); $('topSetSearch').focus(); });
 let tSets;
 $('topSetSearch').addEventListener('input', ()=>{ clearTimeout(tSets); tSets = setTimeout(findSets, 160); });
@@ -3470,7 +3489,7 @@ async function openTop(){
   if(top.kind === 'set' && (!top.set || top.set.game !== game)){ top.set = null; paintTopUI(); topItems = []; renderTop(); findSets(); return; }
   $('topEmpty').hidden = false; $('topEmpty').textContent = 'Getting today’s prices…'; $('topOut').hidden = true; $('topPreview').hidden = true;
   const want = top.n, url = top.kind === 'set' ? '/api/search?settop='+top.set.i+'&n='+want
-    : '/api/search?movers='+top.kind+'&period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '');
+    : '/api/search?movers='+top.kind+'&period='+top.period+'&n='+want+(top.lang ? '&lang='+top.lang : '')+(top.what === 'sealed' ? '&what=sealed'+(top.stype ? '&type='+top.stype : '') : '');
   try{
     const r = await fetch(url), d = await r.json();
     if(!r.ok) throw new Error(d.error || 'bad');
@@ -3492,7 +3511,7 @@ async function openTop(){
 function topTitle(){
   const per = top.period === 'month' ? 'This month' : 'This week';
   return top.kind === 'set' ? {big: 'TOP '+topItems.length, line: 'MOST VALUABLE · '+(top.set ? shortSet(top.set.name).toUpperCase() : ''), sub: top.set && top.set.lang === 'jp' ? 'Japanese set' : ''}
-    : {big: 'TOP '+topItems.length, line: KINDS[top.kind].toUpperCase()+' · '+per.toUpperCase(), sub: top.lang ? LANGN[top.lang]+' cards' : 'English & Japanese'};
+    : {big: 'TOP '+topItems.length, line: KINDS[top.kind].toUpperCase()+' · '+per.toUpperCase(), sub: top.what === 'sealed' ? (STYPE[top.stype] || 'Sealed')+(top.lang ? ' · '+LANGN[top.lang] : '') : top.lang ? LANGN[top.lang]+' cards' : 'English & Japanese'};
 }
 function renderTop(){
   const has = topItems.length > 0;
@@ -3511,11 +3530,12 @@ function renderTop(){
     const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = money(fromUsd(x.best));
     if(top.kind !== 'set' || x.change != null){ const ch = document.createElement('span'); ch.className = 'ch';
       ch.textContent = top.kind === 'sold' ? x.sold+' sold' : (x.change >= 0 ? '▲ ' : '▼ ')+Math.abs(x.change*100).toFixed(1)+'%'; ch.style.color = top.kind === 'sold' ? 'var(--muted)' : x.change >= 0 ? C.win : C.loss; pr.append(ch); }
-    li.append(rk, thumb(x.id, false), mid, pr); ol.append(li);
+    li.append(rk, thumb(x.id, x.kind === 'sealed'), mid, pr); ol.append(li);
   });
   $('topNote').textContent = top.kind === 'set' ? 'Today’s TCGplayer near-mint market price for each card.'
+    : top.what === 'sealed' ? 'Change from TCGplayer’s market price for sealed product '+(top.period === 'month' ? '30' : '7')+' days ago to today. Sealed products worth $20+ with at least '+(top.period === 'month' ? 6 : 3)+' sales in that time'
     : 'Change from TCGplayer’s near-mint market price '+(top.period === 'month' ? '30' : '7')+' days ago to today. Cards worth $20+ with at least '+(top.period === 'month' ? 12 : 6)+' sales in that time'+(topMeta && topMeta.at ? '. History updated '+new Date(topMeta.at).toLocaleDateString('en-AU', {day: 'numeric', month: 'short'}) : '')+'.';
-  topItems.forEach(x=>productArt(x.id, false));
+  topItems.forEach(x=>productArt(x.id, x.kind === 'sealed'));
   drawTopSoon();
 }
 function drawTopSoon(){ clearTimeout(tTop); tTop = setTimeout(()=>{ const cv = drawTopList(); if(cv) $('topImg').src = cv.toDataURL('image/jpeg', 0.9); }, 200); }
@@ -3589,14 +3609,18 @@ function topFoil(ctx, X, Y, w, h, rad, s){
   ctx.restore();
 }
 function topCard(ctx, x, X, Y, w, h, metal, foilS){
-  const rad = Math.round(w*0.045), a = productArt(x.id, false);
+  const sealedX = x.kind === 'sealed', rad = Math.round(w*0.045), a = productArt(x.id, sealedX);
   // lift: contact shadow + long drop shadow
   ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.fillStyle = '#111';
   ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 26; ctx.fill();
   ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3; ctx.fill(); ctx.restore();
   // layered glow for the podium: wide haze, mid bloom, tight rim
   if(metal){ [[90, .22], [40, .45], [14, .8]].forEach(([b, al])=>{ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.shadowColor = hexA(metal.glow, al); ctx.shadowBlur = b; ctx.fillStyle = '#111'; ctx.fill(); ctx.restore(); }); }
-  if(a){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(w/iw, h/ih); ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
+  if(a && sealedX){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip();
+    const tg = ctx.createLinearGradient(X, Y, X, Y + h); tg.addColorStop(0, '#1C1C1F'); tg.addColorStop(1, '#0B0B0C'); ctx.fillStyle = tg; ctx.fillRect(X, Y, w, h);
+    const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(w*0.86/iw, h*0.86/ih);
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
+  else if(a){ ctx.save(); rrect(ctx, X, Y, w, h, rad); ctx.clip(); const im = a.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.max(w/iw, h/ih); ctx.drawImage(im, X + (w - iw*k)/2, Y + (h - ih*k)/2, iw*k, ih*k); ctx.restore(); }
   topFoil(ctx, X, Y, w, h, rad, foilS);
   if(metal){
     const g = ctx.createLinearGradient(X, Y, X + w, Y + h); metal.stops.forEach((c, i)=>g.addColorStop(i/(metal.stops.length-1), c));
@@ -3886,7 +3910,7 @@ $('copyTier').addEventListener('click', ()=>{
 function drawTopList(){
   if(!topItems.length || !bcFonts()) return null;
   const n = topItems.length, W = 1200, gx = 40, INK = '#F4F4F5', LIME = '#A3E635', faint = 'rgba(244,244,245,.5)', rnd = bcRand(n*31 + 7);
-  const lead = productArt(topItems[0].id, false), [cA] = lead ? artPalette(lead.img, topItems[0].id) : [LIME];
+  const lead = productArt(topItems[0].id, topItems[0].kind === 'sealed'), [cA] = lead ? artPalette(lead.img, topItems[0].id) : [LIME];
   // podium geometry
   const pod = Math.min(3, n), w1 = 330, h1 = Math.round(w1*1.395), w2 = 268, h2 = Math.round(w2*1.395), pgap = 46;
   const chips = top.kind !== 'set' || topItems.some(x=>x.change != null), cb = chips ? 40 : 0;
@@ -3955,7 +3979,7 @@ function drawTopList(){
   }
   // footer
   ctx.textAlign = 'left'; ctx.font = '700 14px "JetBrains Mono"'; spaced(ctx, 3); ctx.fillStyle = faint;
-  const foot = top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : 'TCGPLAYER NEAR MINT MARKET  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
+  const foot = top.kind === 'set' ? 'TCGPLAYER NEAR MINT MARKET  ·  '+cur+'  ·  '+today : (top.what === 'sealed' ? 'TCGPLAYER SEALED MARKET' : 'TCGPLAYER NEAR MINT MARKET')+'  ·  CHANGE VS '+(top.period === 'month' ? '30' : '7')+' DAYS AGO  ·  '+cur;
   ctx.fillText(foot, gx, H - 28); ctx.textAlign = 'right'; ctx.fillStyle = LIME; ctx.fillText('POKESNIPR.COM', W - gx, H - 28); ctx.textAlign = 'left'; spaced(ctx, 0);
   grainVignette(ctx, rnd, .022, .45);
   return cv;

@@ -258,14 +258,18 @@ window.__noShare = true;
   function movers(){ return movP || (movP = realFetch('movers.json').then(function(r){ if(!r.ok) throw 0; return r.json(); })); }
   function moverList(c, m, q){
     var kind=q.get('movers'), per=q.get('period')==='month' ? 'month' : 'week', n=Math.min(30, Number(q.get('n'))||20), lang=({en:0,jp:1})[q.get('lang')];
+    var sealed=q.get('what')==='sealed', stype=q.get('type')||'';
     var at={}; c.items.forEach(function(e,i){ at[e[0]+'|'+e[4]]=i; });
     var list=[];
     (m.rows||[]).forEach(function(r){
       var i=at[r[0]+'|'+r[1]]; if(i==null) return; var e=c.items[i];
       if(lang!=null && c.sets[e[7]][2]!==lang) return;
+      if((e[8]==='s')!==sealed) return;
+      if(sealed && stype && sealedType(e[1])!==stype) return;
       var then = per==='week' ? r[3] : r[4], sold = per==='week' ? r[5] : r[6];
       if(!then || !r[2]) return;
-      if(kind!=='sold' && sold < (per==='week' ? 6 : 12)) return;   // enough sales that the move is real, not one odd sale
+      // enough sales that the move is real, not one odd sale (sealed sells in smaller numbers)
+      if(kind!=='sold' && sold < (sealed ? (per==='week' ? 3 : 6) : (per==='week' ? 6 : 12))) return;
       var ch = r[2]/then - 1;
       list.push({i:i, ch:ch, then:then, now:r[2], sold:sold});
     });
@@ -276,6 +280,18 @@ window.__noShare = true;
     var seen={}; list = list.filter(function(x){ var k=c.items[x.i][0]; if(seen[k]) return false; seen[k]=1; return true; }).slice(0, n);
     return {results: list.map(function(x){ var o=res(c,x.i); o.then=x.then; o.histNow=x.now; o.sold=x.sold; o.change=x.ch; o.setDate=c.sets[c.items[x.i][7]][1]; return o; }), rows: list.map(function(x){ return x.i; }), moversAt: m.builtAt};
   }
+  // Sealed product type from its TCGplayer name (cases first, so a "Booster Box Case" is a case, not a box).
+  function sealedType(name){
+    var n=(name||'').toLowerCase();
+    if(/\bcase\b/.test(n)) return 'case';
+    if(/poster|sticker/.test(n)) return 'poster';
+    if(/elite trainer box/.test(n)) return 'etb';
+    if(/booster box|booster display/.test(n)) return 'box';
+    if(/bundle/.test(n)) return 'bundle';
+    if(/booster pack|blister|sleeved/.test(n)) return 'pack';
+    return 'collection';
+  }
+  window.__sealedType=sealedType;
   function json(body, status){ return new Response(JSON.stringify(body), {status: status||200, headers:{'Content-Type':'application/json'}}); }
   window.fetch=function(input, init){
     var url = typeof input==='string' ? input : input.url;
