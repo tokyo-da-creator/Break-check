@@ -3603,9 +3603,23 @@ function drawPriceWatch(st){
     const dot = (q)=>{ ctx.beginPath(); ctx.arc(q[0], q[1], 11, 0, Math.PI*2); ctx.fillStyle = trend; ctx.fill(); ctx.beginPath(); ctx.arc(q[0], q[1], 4, 0, Math.PI*2); ctx.fillStyle = '#030303'; ctx.fill(); };
     const a = P[0], b = P[P.length-1];
     dot(a); dot(b);
-    const tagAt = (q, v, d, align)=>{ const above = q[1] - 58 > gy0 - 40; const y = above ? q[1] - 40 : q[1] + 42;
-      ctx.textAlign = align; ctx.font = '700 26px "Barlow Semi Condensed"'; ctx.fillStyle = trend; ctx.fillText(compactMoney(fromUsd(v)), q[0], y);
-      ctx.font = '700 15px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(d, q[0], y + 20); ctx.textAlign = 'left'; };
+    // Price tags sit where the line isn't: try above, below, then beside the dot, and pick the first spot clear of the line.
+    const dense = []; for(let i = 1; i < P.length; i++){ const [x0, y0] = P[i-1], [x1, y1] = P[i], n = Math.max(1, Math.ceil(Math.hypot(x1-x0, y1-y0)/4)); for(let k = 0; k <= n; k++) dense.push([x0 + (x1-x0)*k/n, y0 + (y1-y0)*k/n]); }
+    const tagAt = (q, v, d, align)=>{
+      const money = compactMoney(fromUsd(v));
+      ctx.font = '700 26px "Barlow Semi Condensed"'; const w1 = ctx.measureText(money).width; ctx.font = '700 15px "Barlow Semi Condensed"'; const w = Math.max(w1, ctx.measureText(d).width);
+      const side = align === 'left' ? 1 : -1;
+      const spots = [[q[0], q[1] - 40], [q[0], q[1] + 42], [q[0] + side*26, q[1] - 6], [q[0] + side*26, q[1] + 30], [q[0] + side*26, q[1] - 46], [q[0] + side*26, q[1] + 64]];
+      const box = ([x, y])=>{ const l = align === 'left' ? x : x - w; return [l - 8, y - 26, l + w + 8, y + 26]; };
+      const hits = r => dense.reduce((n, [x, y])=>n + (x > r[0] && x < r[2] && y > r[1] - 6 && y < r[3] + 6 ? 1 : 0), 0) + (Math.hypot(Math.max(r[0] - q[0], 0, q[0] - r[2]), Math.max(r[1] - q[1], 0, q[1] - r[3])) < 14 ? 50 : 0);
+      const inside = r => r[1] > gy0 - 50 && r[3] < gy1 + 4 && r[0] > gx0 - 30 && r[2] < gx1 + 30;
+      let best = null, bestN = Infinity;
+      for(const sp of spots){ const r = box(sp); if(!inside(r)) continue; const n = hits(r); if(n < bestN){ best = sp; bestN = n; } if(n === 0) break; }
+      if(!best) best = spots[0];
+      const r = box(best);
+      ctx.save(); rrect(ctx, r[0], r[1] - 2, r[2] - r[0], r[3] - r[1] + 2, 10); ctx.fillStyle = 'rgba(6,6,9,.82)'; ctx.fill(); ctx.restore();   // a dark chip, so the tag always reads
+      ctx.textAlign = align; ctx.font = '700 26px "Barlow Semi Condensed"'; ctx.fillStyle = trend; ctx.fillText(money, best[0], best[1]);
+      ctx.font = '700 15px "Barlow Semi Condensed"'; ctx.fillStyle = INK; ctx.fillText(d, best[0], best[1] + 20); ctx.textAlign = 'left'; };
     tagAt(a, startV, shortDate(st.pts[0][0]), 'left'); tagAt(b, nowV, 'TODAY', 'right');
   } else { ctx.font = '500 18px Archivo'; ctx.fillStyle = faint; ctx.textAlign = 'center'; ctx.fillText(st.loading ? 'Loading price history…' : upcoming(st.it) ? 'Out '+outDate(st.it.setDate)+'. Price history starts at release.' : 'No TCGplayer sales in this period.', CX0 + CW/2, CY0 + CH/2); ctx.textAlign = 'left'; }
   // name
