@@ -454,6 +454,14 @@ input[type=range]{padding:0;min-height:36px;accent-color:var(--win);border:0;bac
 .creator .at input{flex:1;border:0;background:transparent;color:var(--fg);font:600 15px var(--body);min-height:40px;padding:0 4px;outline:none;min-width:0}
 .creator .av{width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--line);flex:none}
 .creator .who{font:700 15px var(--body);color:var(--fg);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.creator .wmrow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px}
+.creator .wmrow .swatches{display:flex;gap:6px;flex-wrap:wrap}
+.creator .wmrow .swatches button{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;min-height:0}
+.creator .wmrow .swatches button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}
+.creator .wmrow input[type=range]{flex:1 1 120px;min-width:100px}
+.btn.xbtn{background:#000;color:#fff;border-color:#3a3a3a;gap:8px;display:inline-flex;align-items:center;justify-content:center}
+.btn.xbtn:hover{border-color:#fff}
+.btn.xbtn svg{width:16px;height:16px;fill:currentColor}
 .creator .sw{display:flex;align-items:center;gap:8px;font:600 13px var(--body);color:var(--muted);cursor:pointer}
 .creator .sw input{width:18px;height:18px;accent-color:var(--win)}
 .creator .btn.sm{min-height:40px;padding:0 14px;flex:none}
@@ -647,6 +655,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="creator" data-creator></div>
         <div class="btns">
           <button class="btn primary" id="shareVerdict">Share link</button>
+          <button class="btn xbtn" id="xVerdict" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button>
           <button class="btn" id="saveVerdict">Save card</button>
           <button class="btn" id="toLog">I bought it → log pulls</button>
         </div>
@@ -721,6 +730,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="creator" data-creator></div>
         <div class="btns">
           <button class="btn primary" id="shareReceipt">Share link</button>
+          <button class="btn xbtn" id="xLog" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button>
           <button class="btn" id="saveReceipt">Save card</button>
           <button class="btn" id="copyCap">Copy caption</button>
           <button class="btn" id="saveBreak">Save to my breaks</button>
@@ -831,7 +841,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <ol class="toprows" id="topRows"></ol>
         <div class="hint" id="topNote"></div>
         <div class="creator" data-creator></div>
-        <div class="btns"><button class="btn primary" id="saveTop">Save image</button><button class="btn" id="copyTop">Copy caption</button></div>
+        <div class="btns"><button class="btn primary" id="saveTop">Save image</button><button class="btn xbtn" id="xTop" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button><button class="btn" id="copyTop">Copy caption</button></div>
       </div>
       <div class="status" id="statusTop"></div>
     </div>
@@ -843,7 +853,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="tw"><table class="cmptable" id="cmpTable"></table></div>
         <div class="hint" id="cmpNote"></div>
         <div class="creator" data-creator></div>
-        <div class="btns"><button class="btn primary" id="saveCmp" type="button">Save image</button><button class="btn" id="copyCmp" type="button">Copy caption</button></div>
+        <div class="btns"><button class="btn primary" id="saveCmp" type="button">Save image</button><button class="btn xbtn" id="xCmp" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button><button class="btn" id="copyCmp" type="button">Copy caption</button></div>
       </div>
       <div class="status" id="statusCmp"></div>
     </div>
@@ -907,7 +917,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       <div class="empty-state" id="tierEmpty">Add some cards and rank them. Your tier list image shows up here.</div>
       <div id="tierOut" style="display:flex;flex-direction:column;gap:12px" hidden>
         <div class="creator" data-creator></div>
-        <div class="btns"><button class="btn primary" id="saveTier">Save image</button><button class="btn" id="copyTier">Copy caption</button></div>
+        <div class="btns"><button class="btn primary" id="saveTier">Save image</button><button class="btn xbtn" id="xTier" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button><button class="btn" id="copyTier">Copy caption</button></div>
       </div>
       <div class="status" id="statusTier"></div>
     </div>
@@ -979,6 +989,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="creator" data-creator></div>
         <div class="btns">
           <button class="btn primary" id="saveShow">Save card</button>
+          <button class="btn xbtn" id="xShow" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button>
           <button class="btn" id="copyShow">Copy caption</button>
         </div>
       </div>
@@ -1039,6 +1050,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
         <div class="creator" data-creator></div>
         <div class="btns">
           <button class="btn primary" id="sharePsa" type="button">Share link</button>
+          <button class="btn xbtn" id="xPsa" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Post to X</button>
           <button class="btn" id="savePsa" type="button">Save image</button>
           <button class="btn" id="copyPsa" type="button">Copy caption</button>
         </div>
@@ -1414,7 +1426,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791645911';
+(function(){ var BUILD='1791655688';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -3286,10 +3298,28 @@ async function squareAvatar(blob){
   const s0 = Math.min(bmp.width, bmp.height); c.getContext('2d').drawImage(bmp, (bmp.width - s0)/2, (bmp.height - s0)/2, s0, s0, 0, 0, n, n);
   return c.toDataURL('image/jpeg', 0.9);
 }
+// Watermark for every share image: {on, color, op}. Lives with your @handle.
+const WM_COLS = ['#A3E635', '#F4F4F5', '#E8B931', '#FF4D6D', '#3DC8FF', '#9A7CFF', '#030303'];
+let wmAll = Object.assign({on: true, color: '#A3E635', op: 14}, store.get('wm1') || {});
+function setWm(ch){ wmAll = Object.assign({}, wmAll, ch); store.set('wm1', wmAll); paintCreator(); redrawAllCards(); }
+function redrawAllCards(){ try{ updateCheck(); updateLog(); updateShow(); }catch(e){} if(!$('panel-tier').hidden) drawTierSoon(); if(!$('panel-top').hidden){ if(top.kind === 'vs') openCompare(); else drawTopSoon(); } if(!$('panel-psa').hidden) updatePsa(); }
+function wmActive(){ return !!(wmAll.on && creatorOn()); }
+function stampWatermark(cv){
+  if(!cv || cv._wm || !wmActive()) return cv; cv._wm = true;
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, txt = '@'+creator.handle, col = wmAll.color, al = wmAll.op/100, sc = Math.max(W, H)/1200;
+  ctx.save(); ctx.font = '800 '+Math.round(34*sc)+'px Archivo'; spaced(ctx, 1); const tw = ctx.measureText(txt).width, sx = tw + 120*sc, sy = 150*sc;
+  ctx.translate(W/2, H/2); ctx.rotate(-Math.PI/7);
+  const R = Math.hypot(W, H)/2 + sx;
+  for(let yy = -R, row = 0; yy < R; yy += sy, row++) for(let xx = -R + (row % 2 ? sx/2 : 0); xx < R; xx += sx){
+    ctx.globalAlpha = al*0.9; ctx.lineWidth = 3*sc; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(txt, xx, yy);
+    ctx.globalAlpha = al; ctx.fillStyle = col; ctx.fillText(txt, xx, yy);
+  }
+  ctx.restore(); return cv;
+}
 function setCreator(c){
   creator = c; store.set('creator', c);
   if(c && c.img){ if(creatorImg.src !== c.img) creatorImg.src = c.img; }
-  paintCreator(); updateCheck(); updateLog(); updateShow(); if(!$('panel-tier').hidden) drawTierSoon();
+  paintCreator(); redrawAllCards();
 }
 function paintCreator(){
   document.querySelectorAll('[data-creator]').forEach(box=>{
@@ -3305,6 +3335,21 @@ function paintCreator(){
       const ch = document.createElement('button'); ch.type = 'button'; ch.className = 'linkbtn'; ch.textContent = 'Change';
       ch.addEventListener('click', ()=>setCreator(null));
       row.append(im, who, sw, ch); box.append(row);
+      // tiled @handle over every image (same style as tier lists), so a crop or repost still carries your name
+      const wr = document.createElement('div'); wr.className = 'wmrow';
+      const wsw = document.createElement('label'); wsw.className = 'sw';
+      const wcb = document.createElement('input'); wcb.type = 'checkbox'; wcb.checked = !!wmAll.on;
+      wcb.addEventListener('change', ()=>setWm({on: wcb.checked}));
+      wsw.append(wcb, document.createTextNode('Watermark every image'));
+      wr.append(wsw);
+      if(wmAll.on){
+        const sws = document.createElement('div'); sws.className = 'swatches';
+        WM_COLS.forEach(c=>{ const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', 'Watermark colour '+c); b.setAttribute('aria-pressed', wmAll.color.toLowerCase() === c.toLowerCase()); b.addEventListener('click', ()=>setWm({color: c})); sws.append(b); });
+        const rg = document.createElement('input'); rg.type = 'range'; rg.min = 6; rg.max = 36; rg.step = 1; rg.value = wmAll.op; rg.setAttribute('aria-label', 'Watermark strength');
+        rg.addEventListener('change', ()=>setWm({op: Number(rg.value)}));
+        wr.append(sws, rg);
+      }
+      box.append(wr);
       return;
     }
     const t = document.createElement('div'); t.innerHTML = '<div class="ttl">Put your X on your cards</div><div class="sub">Your profile picture and @username go on the card, receipt and banner.</div>';
@@ -3829,14 +3874,18 @@ function drawShowcase(st){
   return cv;
 }
 $('saveShow').addEventListener('click', async ()=>{ await refreshPrices(); const st = showStats(); if(!st) return; const cv = st.watch ? drawPriceWatch(st) : drawShowcase(st); if(cv) save(cv, (st.watch ? 'price-watch-' : 'card-spotlight-')+st.it.id+'.jpg', $('statusShow'), 'image/jpeg'); });
-$('copyShow').addEventListener('click', ()=>{
-  const st = showStats(); if(!st) return; const it = st.it;
+function capShow(){
+  const st = showStats(); if(!st) return ''; const it = st.it;
   const tag = GAMES[it.game==='onepiece' ? 'onepiece' : 'pokemon'].tag;
   const cap = st.watch
     ? it.name+' ('+shortSet(it.set)+(it.number ? ' #'+it.number : '')+')'+(st.change!=null ? (st.change>=0 ? ' is up ' : ' is down ')+Math.abs(st.change*100).toFixed(1)+'% '+st.period+': '+money(fromUsd(st.pts[0][1]))+' → '+money(fromUsd(st.market!=null ? st.market : st.pts[st.pts.length-1][1])) : ' · Market '+money(fromUsd(st.market||0)))+'. '+tag+' #breakcheck pokesnipr.com'
     : it.name+' ('+shortSet(it.set)+(it.number ? ' #'+it.number : '')+')'+(show.grade !== 'Raw' ? ' · '+show.grade : '')
     +(st.market!=null ? ' · Market '+money(fromUsd(st.market)) : '')+(st.change!=null ? ' · '+(st.change>=0?'+':'-')+Math.abs(st.change*100).toFixed(1)+'% '+st.period : '')
     +(st.paid ? ' · Paid '+money(st.paid)+(show.where ? ' on '+show.where : '') : '')+' · '+GAMES[it.game==='onepiece' ? 'onepiece' : 'pokemon'].tag+' #breakcheck pokesnipr.com';
+  return cap;
+}
+$('copyShow').addEventListener('click', ()=>{
+  const cap = capShow(); if(!cap) return;
   const done = ()=>{ $('statusShow').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusShow').textContent = cap; };
   try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
 });
@@ -4137,7 +4186,6 @@ const TIER_PRESETS = {
   Ice: ['#E8F6FF', '#B8E4FF', '#86CFFF', '#58B6F5', '#3A93D6', '#2A6FA8', '#1D4E7A'],
   Ember: ['#FF3D3D', '#FF6A2B', '#FF9A2B', '#FFC24A', '#B9A27A', '#7D7468', '#4A4743']
 };
-const WM_COLS = ['#A3E635', '#F4F4F5', '#E8B931', '#FF4D6D', '#3DC8FF', '#9A7CFF', '#030303'];
 const tierNew = () => ({title: '', sub: '', prices: true, say: {on: true, l1: '', l2: ''}, wm: {on: true, color: '#A3E635', op: 16}, preset: 'Rainbow',
   tiers: ['S', 'A', 'B', 'C', 'D', 'F'].map((l, i)=>({label: l, color: TIER_PRESETS.Rainbow[i], keys: []})), pool: [], items: {}});
 let tier = store.get('tier1') || tierNew(); if(!tier.say) tier.say = {on: true, l1: '', l2: ''};
@@ -4305,9 +4353,12 @@ document.querySelectorAll('#tierSay button').forEach(b=>b.addEventListener('clic
 ['tierSay1', 'tierSay2'].forEach((id, i)=>$(id).addEventListener('input', ()=>{ tier.say[i ? 'l2' : 'l1'] = $(id).value; saveTier(); drawTierSoon(); }));
 $('tierWmOp').addEventListener('input', ()=>{ tier.wm.op = Number($('tierWmOp').value); saveTier(); drawTierSoon(); });
 $('saveTier').addEventListener('click', ()=>{ const cv = drawTierList(tierState()); if(cv) save(cv, 'tier-list.jpg', $('statusTier'), 'image/jpeg'); });
-$('copyTier').addEventListener('click', ()=>{
+function capTier(){
   const T = tierState(), lines = T.tiers.filter(t=>t.items.length).slice(0, 3).map(t=>t.label+': '+t.items.slice(0, 3).map(x=>topName(x)).join(', ')+(t.items.length > 3 ? ' +'+(t.items.length - 3) : ''));
-  const cap = T.title+'\n'+lines.join('\n')+'\nWhat would you change? #breakcheck pokesnipr.com';
+  return T.title+'\n'+lines.join('\n')+'\nWhat would you change? #breakcheck pokesnipr.com';
+}
+$('copyTier').addEventListener('click', ()=>{
+  const cap = capTier();
   const done = ()=>{ $('statusTier').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusTier').textContent = cap; };
   try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
 });
@@ -4389,12 +4440,15 @@ function drawTopList(){
   return cv;
 }
 $('saveTop').addEventListener('click', async ()=>{ const cv = drawTopList(); if(cv) save(cv, 'top-'+top.kind+'-'+(top.set ? top.set.i : top.period)+'.jpg', $('statusTop'), 'image/jpeg'); });
-$('copyTop').addEventListener('click', ()=>{
-  if(!topItems.length) return; const T = topTitle();
+function capTop(){
+  if(!topItems.length) return '';
   const head = top.kind === 'set' ? 'Top '+topItems.length+' most valuable cards in '+shortSet(top.set.name)+' (TCGplayer market, '+today.toLowerCase().replace(/\b\w/g, c=>c.toUpperCase())+'):'
     : KINDS[top.kind]+' '+(top.period === 'month' ? 'this month' : 'this week')+' (TCGplayer market):';
   const lines = topItems.slice(0, 5).map((x,k)=>'#'+(k+1)+' '+x.name+' '+money(fromUsd(x.best), x.best >= 1000 ? 0 : 2)+(top.kind==='gain'||top.kind==='drop' ? ' ('+(x.change>=0?'+':'-')+Math.abs(x.change*100).toFixed(1)+'%)' : ''));
-  const cap = head+'\n'+lines.join('\n')+'\n'+GAMES[game].tag+' #breakcheck pokesnipr.com';
+  return head+'\n'+lines.join('\n')+'\n'+GAMES[game].tag+' #breakcheck pokesnipr.com';
+}
+$('copyTop').addEventListener('click', ()=>{
+  const cap = capTop(); if(!cap) return;
   const done = ()=>{ $('statusTop').textContent = 'Caption copied.'; }, fb = ()=>{ $('statusTop').textContent = cap; };
   try{ navigator.clipboard.writeText(cap).then(done, fb); }catch(e){ fb(); }
 });
@@ -4640,10 +4694,14 @@ async function save(cv, filename, statusEl, type){
 }
 $('saveVerdict').addEventListener('click',()=>{ const c = updateCheck(); if(c) save(drawVerdict(c), 'break-check-verdict.png', $('statusCheck')); });
 $('saveReceipt').addEventListener('click',()=>{ const d = logData(); if(d) save(drawBreakCard(d) || drawReceipt(d), 'break-card-'+receiptNo+'.png', $('statusLog')); });
-$('copyCap').addEventListener('click',()=>{
-  const d = logData(); if(!d) return;
+function capLog(){
+  const d = logData(); if(!d) return '';
   const top = d.r.top ? ' Best pull: '+d.r.top.name+' ('+money(d.r.top.value)+').' : '';
-  const cap = 'Paid '+money(d.spent)+', pulled '+money(d.r.pulled)+'. '+pct(d.r.roi)+', '+d.r.line+'.'+top+(d.v.ok?' ✓ Verified prices.':'')+' '+GAMES[gameOf(d.sealed ? d.sealedItems : d.items)==='onepiece' ? 'onepiece' : 'pokemon'].tag+' #breakcheck';
+  const cap = 'Paid '+money(d.spent)+', pulled '+money(d.r.pulled)+'. '+pct(d.r.roi)+', '+d.r.line+'.'+top+(d.v.ok?' ✓ Verified prices.':'')+' '+GAMES[gameOf(d.sealed ? d.sealedItems : d.items)==='onepiece' ? 'onepiece' : 'pokemon'].tag+' #breakcheck pokesnipr.com';
+  return cap;
+}
+$('copyCap').addEventListener('click',()=>{
+  const cap = capLog(); if(!cap) return;
   const fb = ()=>{ const t=$('capFallback'); t.value=cap; t.hidden=false; t.focus(); t.select(); $('statusLog').textContent='Copy the caption above.'; };
   try{ navigator.clipboard.writeText(cap).then(()=>{ $('statusLog').textContent='Caption copied.'; }, fb); }catch(e){ fb(); }
 });
@@ -4671,6 +4729,12 @@ async function shareLink(btn, payload, text, statusEl, cardCv, ogCv){
   }catch(e){
     statusEl.textContent = 'Couldn’t make a link right now. Save the card instead, or try again in a minute.';
   }finally{ btn.disabled = false; btn.textContent = label; }
+}
+function capVerdict(){
+  const c = updateCheck(); if(!c) return '';
+  const over = c.v.diff < -0.004;
+  return (over ? 'Overpaying '+money(-c.v.diff)+' for '+c.what : c.v.diff > 0.004 ? 'Saving '+money(c.v.diff)+' on '+c.what : 'Priced at value')
+    +' 👀 Paying '+money(c.pay)+' for something worth '+money(c.worth)+'. '+cur+' #breakcheck pokesnipr.com';
 }
 $('shareVerdict').addEventListener('click',()=>{
   const c = updateCheck(); if(!c) return;
@@ -5127,15 +5191,82 @@ function drawCompare(A, B){
   return cv;
 }
 $('saveCmp').addEventListener('click', ()=>{ if(!cmp.a || !cmp.b) return; const cv = drawCompare(cmpStats(cmp.a), cmpStats(cmp.b)); if(cv) save(cv, 'break-check-compare.png', $('statusCmp')); });
-$('copyCmp').addEventListener('click', ()=>{
-  if(!cmp.a || !cmp.b) return; const A = cmpStats(cmp.a), B = cmpStats(cmp.b); if(A.now == null || B.now == null) return;
+function capCmp(){
+  if(!cmp.a || !cmp.b) return ''; const A = cmpStats(cmp.a), B = cmpStats(cmp.b); if(A.now == null || B.now == null) return '';
   const cheap = A.now <= B.now ? cmp.a : cmp.b, d = Math.abs(A.now - B.now);
   let cap = shortName(cmp.a)+' ('+money(fromUsd(A.now), 0)+') vs '+shortName(cmp.b)+' ('+money(fromUsd(B.now), 0)+'). '+(d >= 0.005 ? shortName(cheap)+' is '+money(fromUsd(d), 0)+' cheaper' : 'Same price');
   if(A.perPack != null && B.perPack != null) cap += ', '+money(fromUsd(A.perPack))+' vs '+money(fromUsd(B.perPack))+' a pack';
-  cap += '. '+cur+' #breakcheck';
+  return cap + '. '+cur+' #breakcheck pokesnipr.com';
+}
+$('copyCmp').addEventListener('click', ()=>{
+  const cap = capCmp(); if(!cap) return;
   try{ navigator.clipboard.writeText(cap).then(()=>{ $('statusCmp').textContent = 'Caption copied.'; }, ()=>{ $('statusCmp').textContent = cap; }); }catch(e){ $('statusCmp').textContent = cap; }
 });
 holo($('cmpPreview').querySelector('.holo'));
+
+// ---------- Post to X ----------
+// Phone: the share sheet gets the image itself plus the caption. Computer: X's web composer can't take an
+// image, so we make a share link whose preview is the card and open X with the caption and that link.
+const IS_PHONE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+function ogFrom(cv){
+  const W = 1200, H = 630, o = document.createElement('canvas'); o.width = W; o.height = H; const x = o.getContext('2d');
+  x.fillStyle = '#030303'; x.fillRect(0, 0, W, H);
+  const k = Math.max(W/cv.width, H/cv.height); x.save(); try{ x.filter = 'blur(28px)'; }catch(e){} x.globalAlpha = .45;
+  x.drawImage(cv, (W - cv.width*k)/2, (H - cv.height*k)/2, cv.width*k, cv.height*k); x.restore();
+  x.fillStyle = 'rgba(3,3,3,.55)'; x.fillRect(0, 0, W, H);
+  const f = Math.min((W-40)/cv.width, (H-40)/cv.height), w = cv.width*f, h = cv.height*f;
+  x.drawImage(cv, (W-w)/2, (H-h)/2, w, h); return o;
+}
+async function postToX(btn, cv, cap, statusEl){
+  if(!cv || !cap) return;
+  const fit = t => t.length > 250 ? t.slice(0, 247).replace(/\s+\S*$/, '')+'…' : t;
+  statusEl.textContent = '';
+  if(IS_PHONE){
+    try{ navigator.clipboard.writeText(fit(cap)).catch(()=>{}); }catch(e){}
+    const blob = await toBlob(cv, 'image/jpeg'), file = new File([blob], 'break-check.jpg', {type: 'image/jpeg'});
+    if(navigator.canShare && navigator.canShare({files: [file]})){
+      try{ await navigator.share({files: [file], text: fit(cap)}); statusEl.textContent = 'Pick X in the share sheet. The caption is copied too, paste it if X leaves it out.'; return; }
+      catch(e){ if(e && e.name === 'AbortError'){ return; } }
+    }
+  }
+  const text = fit(cap.replace(/\s*pokesnipr\.com\s*$/, ''));
+  let win = null; try{ win = window.open('about:blank', '_blank'); }catch(e){}
+  const label = btn.innerHTML; btn.disabled = true; btn.textContent = 'Opening X…';
+  try{
+    const res = await fetch('/api/share', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+      kind: 'card', title: cap.split('\n')[0].slice(0, 90), desc: cap.replace(/\s*\n\s*/g, ' · ').slice(0, 220), currency: cur, ratio: cv.width+' / '+cv.height
+    })});
+    if(!res.ok) throw new Error('share');
+    const {id, url} = await res.json();
+    for(const [which, c] of [['card', cv], ['og', ogFrom(cv)]]){
+      const blob = await new Promise(r=>c.toBlob(r, 'image/jpeg', 0.9));
+      const up = await fetch('/api/share/'+id+'/'+which, {method: 'PUT', headers: {'Content-Type': 'image/jpeg'}, body: blob});
+      if(!up.ok) throw new Error('upload');
+    }
+    const intent = 'https://x.com/intent/post?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url);
+    if(win && !win.closed){ try{ win.opener = null; }catch(e){} win.location.href = intent; }
+    else win = window.open(intent, '_blank', 'noopener');
+    const a = document.createElement('a'); a.href = intent; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'open X';
+    statusEl.textContent = win ? 'X is open with your caption. The link shows your card as the picture. ' : 'Your post is ready: ';
+    if(!win) statusEl.append(a); else { statusEl.append('Didn’t open? ', a); }
+  }catch(e){
+    try{ if(win) win.close(); }catch(_){}
+    statusEl.textContent = 'Couldn’t reach X right now. Save the image and post it yourself, or try again in a minute.';
+  }finally{ btn.disabled = false; btn.innerHTML = label; }
+}
+$('xVerdict').addEventListener('click', ()=>{ const c = updateCheck(); if(c) postToX($('xVerdict'), drawVerdict(c), capVerdict(), $('statusCheck')); });
+$('xLog').addEventListener('click', ()=>{ const d = logData(); if(d) postToX($('xLog'), drawBreakCard(d) || drawReceipt(d), capLog(), $('statusLog')); });
+$('xShow').addEventListener('click', async ()=>{ const st = showStats(); if(!st) return; postToX($('xShow'), st.watch ? drawPriceWatch(st) : drawShowcase(st), capShow(), $('statusShow')); });
+$('xTop').addEventListener('click', ()=>{ postToX($('xTop'), drawTopList(), capTop(), $('statusTop')); });
+$('xCmp').addEventListener('click', ()=>{ if(!cmp.a || !cmp.b) return; postToX($('xCmp'), drawCompare(cmpStats(cmp.a), cmpStats(cmp.b)), capCmp(), $('statusCmp')); });
+$('xTier').addEventListener('click', ()=>{ postToX($('xTier'), drawTierList(tierState()), capTier(), $('statusTier')); });
+$('xPsa').addEventListener('click', ()=>{ if(psaReady()) postToX($('xPsa'), drawPsaSale(false), psaCaption(), $('statusPsa')); });
+
+// Your @handle watermark goes on every share image (the tier list has its own setting).
+const wmWrap = f => function(...a){ return stampWatermark(f.apply(this, a)); };
+drawVerdict = wmWrap(drawVerdict); drawReceipt = wmWrap(drawReceipt); drawReceiptWide = wmWrap(drawReceiptWide);
+drawBreakCard = wmWrap(drawBreakCard); drawBanner = wmWrap(drawBanner); drawPriceWatch = wmWrap(drawPriceWatch);
+drawShowcase = wmWrap(drawShowcase); drawTopList = wmWrap(drawTopList); drawPsaSale = wmWrap(drawPsaSale); drawCompare = wmWrap(drawCompare);
 
 // ---------- restore + boot ----------
 const sc = store.get('check3');

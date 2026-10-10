@@ -299,7 +299,7 @@ async function createShare(req, env) {
       })).filter((it) => it.name)
     : [];
   const meta = {
-    kind: body?.kind === "verdict" ? "verdict" : body?.kind === "psa" ? "psa" : "receipt",
+    kind: ["verdict", "psa", "card"].includes(body?.kind) ? body.kind : "receipt",
     title: clean(body?.title, 90) || "Break Check",
     desc: clean(body?.desc, 220),
     items,
@@ -308,6 +308,8 @@ async function createShare(req, env) {
     priced: clean(body?.priced, 24),
     created: new Date().toISOString(),
   };
+  // Any other share image (Post to X): keep its shape so the page shows it uncropped.
+  if (meta.kind === "card") meta.ratio = /^\d{2,4} \/ \d{2,4}$/.test(String(body?.ratio || "")) ? body.ratio : "16 / 9";
   if (meta.kind === "psa") {
     const p = body?.psa || {};
     const cert = CERT_RE.test(String(p.cert || "")) ? String(p.cert) : "";
@@ -359,8 +361,8 @@ function sharePage(origin, id, meta) {
   const card = `${origin}/i/${id}/card`;
   const t = esc(meta.title);
   const d = esc(meta.desc);
-  const cta = meta.kind === "verdict" ? "Check a price yourself" : meta.kind === "psa" ? "Make your own PSA sale card" : "Check your own break";
-  const ratio = meta.kind === "psa" ? "1 / 1" : "16 / 9";
+  const cta = meta.kind === "verdict" ? "Check a price yourself" : meta.kind === "psa" ? "Make your own PSA sale card" : meta.kind === "card" ? "Make your own on Break Check" : "Check your own break";
+  const ratio = meta.kind === "psa" ? "1 / 1" : meta.kind === "card" ? (meta.ratio || "16 / 9") : "16 / 9";
   const rows = (meta.items || []).map((it) =>
     `<tr><td><div class="in">${esc(it.name)}</div><div class="id">${esc(it.detail)}</div></td><td class="iv">${esc(it.value)}<div class="${it.verified ? "ok" : "self"}">${it.verified ? (meta.kind === "psa" ? "✓ PSA cert" : "✓ today’s price") : (meta.kind === "psa" ? "as reported" : "self-reported")}</div></td></tr>`).join("");
   const breakdown = rows ? `<section class="bd"><h2>${meta.kind === "psa" ? "The sale" : "Price breakdown"}${meta.currency ? ` · ${esc(meta.currency)}` : ""}</h2>
