@@ -56,6 +56,8 @@ window.__noShare = true;
       return (e[1]+' '+alias+num+' '+(bare!==lead?bare+' ':'')+s[0]+' '+e[3]+' '+abbr(e[3])+' '+e[4]+' '+(s[2]===1?'japanese jp':s[2]===2?'chinese cn simplified':'english en')+' '+(c.game==='onepiece'?(/\(parallel\)|\(alternate art\)/i.test(e[1])?'alt art aa parallel ':'')+(/\(manga\)/i.test(e[1])?'manga ':'')+(/booster box/i.test(e[1])?'bb ':''):'')+' '+(e[8]==='s'?'sealed':'card single')).toLowerCase().replace(/é/g,'e');
     });
     c.vars={}; c.items.forEach(function(e){ (c.vars[e[0]]=c.vars[e[0]]||[]).push(e[4]); });
+    // sealed product names, so the page knows a box from a multi-item photo when it cuts the white off
+    window.__pname=window.__pname||{}; c.items.forEach(function(e){ if(e[8]==='s') window.__pname[e[0]]=e[1]; });
     // Chinese singles (CardOS): numeric id -> [CardOS id, image url]
     c.cn=c.cn||{}; window.__cnImg=window.__cnImg||{};
     Object.keys(c.cn).forEach(function(k){ if(c.cn[k][1]) window.__cnImg[k]=c.cn[k][1]; });

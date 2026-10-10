@@ -1148,6 +1148,8 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
       return (e[1]+' '+alias+num+' '+(bare!==lead?bare+' ':'')+s[0]+' '+e[3]+' '+abbr(e[3])+' '+e[4]+' '+(s[2]===1?'japanese jp':s[2]===2?'chinese cn simplified':'english en')+' '+(c.game==='onepiece'?(/\(parallel\)|\(alternate art\)/i.test(e[1])?'alt art aa parallel ':'')+(/\(manga\)/i.test(e[1])?'manga ':'')+(/booster box/i.test(e[1])?'bb ':''):'')+' '+(e[8]==='s'?'sealed':'card single')).toLowerCase().replace(/é/g,'e');
     });
     c.vars={}; c.items.forEach(function(e){ (c.vars[e[0]]=c.vars[e[0]]||[]).push(e[4]); });
+    // sealed product names, so the page knows a box from a multi-item photo when it cuts the white off
+    window.__pname=window.__pname||{}; c.items.forEach(function(e){ if(e[8]==='s') window.__pname[e[0]]=e[1]; });
     // Chinese singles (CardOS): numeric id -> [CardOS id, image url]
     c.cn=c.cn||{}; window.__cnImg=window.__cnImg||{};
     Object.keys(c.cn).forEach(function(k){ if(c.cn[k][1]) window.__cnImg[k]=c.cn[k][1]; });
@@ -1425,7 +1427,7 @@ header.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height
 })();
 
 // Auto-update: if a newer version of the site is live, reload into it (never while you're typing).
-(function(){ var BUILD='1791656439';
+(function(){ var BUILD='1791658235';
   function check(){ fetch('/version.json?'+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
     if(v && v.build && v.build!==BUILD){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; location.reload(); } }).catch(function(){}); }
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
@@ -1647,7 +1649,7 @@ function trimToProduct(im){
   return out;
 }
 // Sealed product off its white studio backdrop (same cut-out the break cards use), or the photo as-is if it can't be cut.
-function sealedCut(a, id){ if(!a) return null; try{ return cutoutWhite(a.img, 'sc'+id) || a.img; }catch(e){ return a.img; } }
+function sealedCut(a, id){ if(!a) return null; try{ return cutoutWhite(a.img, 'sc'+id, id) || a.img; }catch(e){ return a.img; } }
 function productArt(id, sealed){
   if(!id) return null;
   const key = id+(sealed?'s':'c');
@@ -2126,14 +2128,19 @@ function cardTrim(id, big){
   return job;
 }
 const cutUrls = new Map();
+// Cut-outs take a moment each, so thumbnails queue up and run one at a time without freezing the page.
+const cutQ = []; let cutBusy = false;
+function cutLater(fn){ cutQ.push(fn); if(!cutBusy){ cutBusy = true; setTimeout(cutPump, 0); } }
+function cutPump(){ const fn = cutQ.shift(); if(fn){ try{ fn(); }catch(e){} } if(cutQ.length) setTimeout(cutPump, 16); else cutBusy = false; }
 function loadInto(img, id, sealed, big, onFail){
   const done = ()=>img.classList.add('in');
   if(sealed){ // cut the product off its white photo backdrop, so it sits straight on the dark page
     const key = 'ui'+id+(big ? 'b' : ''), hit = cutUrls.get(key);
     if(hit){ img.onload = done; img.src = hit; return; }
     const src = new Image(); src.decoding = 'async';
-    src.onload = ()=>{ let u = null; try{ const c = cutoutWhite(src, key); if(c) u = c.toDataURL('image/png'); }catch(e){}
-      if(u) cutUrls.set(key, u); img.onload = done; img.src = u || src.src; };
+    src.onload = ()=>cutLater(()=>{ let c = null; try{ c = cutoutWhite(src, key, id); }catch(e){}
+      const show = u=>{ if(u) cutUrls.set(key, u); img.onload = done; img.src = u || src.src; };
+      if(c) c.toBlob(b=>show(b ? URL.createObjectURL(b) : null), 'image/png'); else show(null); });
     src.onerror = onFail; src.src = imgSrc(id, big); return; }
   cardTrim(id, big).then(u => { img.onload = done; img.src = u; }).catch(onFail);
 }
@@ -2347,35 +2354,128 @@ function bcEmerge(ctx, a, t, tx, ty, rnd){
   ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14; ctx.globalAlpha = .0; ctx.restore();
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; blob(ctx, tx, ty - 10, 220, hexA(t.col, t.tier === 'hit' ? .35 : .18)); ctx.restore();
 }
-// Studio product photo → clean cut-out: remove the white backdrop connected to the edges, then soften the edge 1px.
+// Studio product photo → clean cut-out. Removes the white backdrop around a sealed product.
+// 1. Flood the backdrop in from the photo's edges, stopping at any visible edge in the picture.
+// 2. Where that flood leaked into the product's own white panels (white boxes on white), the leak shows up as a
+//    "bay" inside the product's outline with soft, edgeless sides, so it is filled back in. Real gaps (between
+//    two items, beside a display lid) have crisp edges all round and stay cut out.
+// 3. The edge is anti-aliased from how far each edge pixel is from the backdrop colour.
 const cutCache = new Map();
-function cutoutWhite(img, key){
-  // Boxes, tins and blisters are convex from the camera, so the clean mask is the convex hull of everything that isn't backdrop.
-  // That keeps the product's own white panels solid (no holes) and gives a smooth anti-aliased edge.
+function cutoutWhite(img, key, id){
   if(cutCache.has(key)) return cutCache.get(key);
-  const W0 = img.naturalWidth || img.width, H0 = img.naturalHeight || img.height, k = Math.min(1, 1000/Math.max(W0, H0));
-  const w = Math.round(W0*k), h = Math.round(H0*k), c = document.createElement('canvas'); c.width = w; c.height = h;
+  let out = null; try{ out = cutoutCore(img, shapeOf(id)); }catch(e){ out = null; }
+  cutCache.set(key, out); return out;
+}
+// 'box': one closed box or tin, so any soft-edged gap inside its outline is a leak. 'free': several items or an
+// open display, so only clearly leaky gaps are filled. '': unknown, in between.
+function shapeOf(id){
+  const n = (window.__pname && window.__pname[id]) || ''; if(!n) return '';
+  if(/case|display|\[set of|set of \d|\+|\b(binder|poster) & |& (binder|poster)\b|blister|sleeved|pack art|booster box|booster pack|bundle \(|lot\b/i.test(n)) return 'free';
+  if(/elite trainer box|collection|\btin\b|booster bundle|build & battle box|surprise box|gift box|trainer box|stadium|premium/i.test(n)) return 'box';
+  return '';
+}
+function cutoutCore(img, mode){
+  const W0 = img.naturalWidth || img.width, H0 = img.naturalHeight || img.height, k = Math.min(2, 640/Math.max(W0, H0));   // small photos are worked at 2x for smoother edges
+  const w = Math.round(W0*k), h = Math.round(H0*k), N = w*h; if(w < 24 || h < 24) return null;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
   const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(img, 0, 0, w, h);
-  const p = x.getImageData(0, 0, w, h).data, pts = [];
-  const fg = i => { const r = p[i*4], g = p[i*4+1], b = p[i*4+2], mn = Math.min(r,g,b), mx = Math.max(r,g,b); return mn < 236 || mx - mn > 26; };
-  for(let y=0; y<h; y++){
-    let l = -1, r = -1, n = 0;
-    for(let xx=0; xx<w; xx++) if(fg(y*w+xx)){ n++; if(l < 0) l = xx; r = xx; }
-    if(n >= 4){ pts.push([l, y], [r + 1, y], [l, y + 1], [r + 1, y + 1]); }
+  const id = x.getImageData(0, 0, w, h), p = id.data;
+  // only cut photos that sit on a white backdrop
+  const R = [], G = [], B = []; let bn = 0;
+  const seeB = i => { bn++; const r = p[i*4], g = p[i*4+1], b = p[i*4+2]; if(Math.min(r, g, b) >= 228){ R.push(r); G.push(g); B.push(b); } };
+  for(let xx = 0; xx < w; xx++){ seeB(xx); seeB((h-1)*w + xx); }
+  for(let y = 0; y < h; y++){ seeB(y*w); seeB(y*w + w - 1); }
+  let cw = 0; for(const i of [w + 1, w + w - 2, (h-2)*w + 1, (h-2)*w + w - 2]) if(Math.min(p[i*4], p[i*4+1], p[i*4+2]) >= 240) cw++;
+  if(R.length < bn*0.35 && cw < 3) return null;
+  const med = a => { a.sort((m, n)=>m-n); return a[a.length >> 1]; }, br = med(R), bgG = med(G), bb = med(B);
+  const d = new Uint8Array(N), gray = new Float32Array(N);
+  for(let i = 0; i < N; i++){ const r = p[i*4], g = p[i*4+1], b = p[i*4+2]; d[i] = Math.max(Math.abs(r-br), Math.abs(g-bgG), Math.abs(b-bb)); gray[i] = (r+g+b)/3; }
+  { const t = new Float32Array(N); for(let y = 1; y < h-1; y++) for(let xx = 1; xx < w-1; xx++){ const i = y*w + xx; t[i] = (gray[i]*4 + gray[i-1] + gray[i+1] + gray[i-w] + gray[i+w])/8; } for(let i = 0; i < N; i++) if(t[i]) gray[i] = t[i]; }   // calm jpeg noise
+  const gm = new Float32Array(N);
+  for(let y = 1; y < h-1; y++) for(let xx = 1; xx < w-1; xx++){
+    const i = y*w + xx, a = gray[i-w-1], b2 = gray[i-w], c2 = gray[i-w+1], dl = gray[i-1], dr = gray[i+1], e = gray[i+w-1], f = gray[i+w], g = gray[i+w+1];
+    const gx = (c2 + 2*dr + g) - (a + 2*dl + e), gy = (e + 2*f + g) - (a + 2*b2 + c2); gm[i] = Math.hypot(gx, gy)/4;
   }
-  if(pts.length < 40){ cutCache.set(key, null); return null; }
-  pts.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
-  const cross = (o,a,b)=> (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
-  const lo = [], hi = [];
+  // 4-connected helpers
+  const nb = (i, fn)=>{ const xx = i % w; if(xx > 0) fn(i-1); if(xx < w-1) fn(i+1); if(i >= w) fn(i-w); if(i < N-w) fn(i+w); };
+  const dilate = (m, it=1)=>{ let a = m; for(let t = 0; t < it; t++){ const o = a.slice(); for(let y = 0, i = 0; y < h; y++) for(let xx = 0; xx < w; xx++, i++) if(a[i]){ if(xx > 0) o[i-1] = 1; if(xx < w-1) o[i+1] = 1; if(y > 0) o[i-w] = 1; if(y < h-1) o[i+w] = 1; } a = o; } return a; };
+  const erode = (m, it=1)=>{ let a = m; for(let t = 0; t < it; t++){ const o = a.slice(); for(let y = 0, i = 0; y < h; y++) for(let xx = 0; xx < w; xx++, i++) if(a[i] && (xx === 0 || xx === w-1 || y === 0 || y === h-1 || !a[i-1] || !a[i+1] || !a[i-w] || !a[i+w])) o[i] = 0; a = o; } return a; };
+  const flood = (ok, seed)=>{ const o = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+    const push = i=>{ if(!o[i] && ok(i)){ o[i] = 1; q[qt++] = i; } };
+    seed(push); while(qh < qt){ const i = q[qh++]; nb(i, push); } return o; };
+  const edgeSeed = push=>{ for(let xx = 0; xx < w; xx++){ push(xx); push((h-1)*w + xx); } for(let y = 0; y < h; y++){ push(y*w); push(y*w + w - 1); } };
+  const label = m=>{ const lab = new Int32Array(N), sizes = [0], q = new Int32Array(N); let n = 0;
+    for(let s = 0; s < N; s++) if(m[s] && !lab[s]){ n++; let qh = 0, qt = 0; lab[s] = n; q[qt++] = s;
+      while(qh < qt){ const i = q[qh++]; nb(i, j=>{ if(m[j] && !lab[j]){ lab[j] = n; q[qt++] = j; } }); } sizes.push(qt); }
+    return {lab, sizes, n}; };
+  const keepBig = m=>{ let tot = 0; for(let i = 0; i < N; i++) tot += m[i]; const {lab, sizes} = label(m), min = Math.max(300*k*k, tot*0.004);
+    const o = new Uint8Array(N); for(let i = 0; i < N; i++) if(lab[i] && sizes[lab[i]] >= min) o[i] = 1; return o; };
+  const fillHoles = m=>{ const out = flood(i=>!m[i], edgeSeed), o = new Uint8Array(N); for(let i = 0; i < N; i++) o[i] = out[i] ? 0 : 1; return o; };
+  // 1. backdrop flood, walled off by edges
+  const TOL = Math.max(W0, H0) < 400 ? 20 : 12;   // small photos are jpeg-noisy round the edges
+  let barrier = new Uint8Array(N); for(let i = 0; i < N; i++) if(gm[i] > 10) barrier[i] = 1; barrier = dilate(barrier);
+  const bg = flood(i=>d[i] <= TOL && !barrier[i], edgeSeed);
+  for(let t = 0; t < 3; t++){ const add = []; for(let i = 0; i < N; i++) if(!bg[i] && d[i] <= TOL*0.6){ let hit = false; nb(i, j=>{ if(bg[j]) hit = true; }); if(hit) add.push(i); } if(!add.length) break; add.forEach(i=>{ bg[i] = 1; }); }
+  let F = new Uint8Array(N); for(let i = 0; i < N; i++) F[i] = bg[i] ? 0 : 1;
+  F = keepBig(F); F = fillHoles(F); F = dilate(erode(F));
+  let fN = 0; for(let i = 0; i < N; i++) fN += F[i]; if(fN > N*0.995 || fN < N*0.05) return null;
+  // 2. the product's outline (convex hull) and the bays between it and the flood
+  const pts = [];
+  for(let y = 0; y < h; y++){ let l = -1, r = -1; for(let xx = 0; xx < w; xx++) if(F[y*w + xx]){ if(l < 0) l = xx; r = xx; } if(l >= 0) pts.push([l, y], [r+1, y], [l, y+1], [r+1, y+1]); }
+  pts.sort((a, b)=>a[0]-b[0] || a[1]-b[1]);
+  const cross = (o, a, b)=>(a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]), lo = [], hi = [];
   for(const q of pts){ while(lo.length >= 2 && cross(lo[lo.length-2], lo[lo.length-1], q) <= 0) lo.pop(); lo.push(q); }
-  for(let i=pts.length-1;i>=0;i--){ const q = pts[i]; while(hi.length >= 2 && cross(hi[hi.length-2], hi[hi.length-1], q) <= 0) hi.pop(); hi.push(q); }
-  const hull = lo.slice(0,-1).concat(hi.slice(0,-1));
-  let L = w, R = 0, T = h, B = 0; hull.forEach(([a,b])=>{ L = Math.min(L,a); R = Math.max(R,a); T = Math.min(T,b); B = Math.max(B,b); });
-  if((R-L)*(B-T) < w*h*0.12){ cutCache.set(key, null); return null; }
-  const o = document.createElement('canvas'); o.width = Math.ceil(R-L); o.height = Math.ceil(B-T); const ox = o.getContext('2d');
-  ox.beginPath(); hull.forEach(([a,b],i)=> i ? ox.lineTo(a-L, b-T) : ox.moveTo(a-L, b-T)); ox.closePath();
-  ox.fillStyle = '#000'; ox.fill(); ox.globalCompositeOperation = 'source-in'; ox.drawImage(c, -L, -T);
-  cutCache.set(key, o); return o;
+  for(let i = pts.length-1; i >= 0; i--){ const q = pts[i]; while(hi.length >= 2 && cross(hi[hi.length-2], hi[hi.length-1], q) <= 0) hi.pop(); hi.push(q); }
+  const hull = lo.slice(0, -1).concat(hi.slice(0, -1));
+  const hc = document.createElement('canvas'); hc.width = w; hc.height = h; const hx = hc.getContext('2d', {willReadFrequently: true});
+  hx.beginPath(); hull.forEach(([a, b], i)=> i ? hx.lineTo(a, b) : hx.moveTo(a, b)); hx.closePath(); hx.fillStyle = '#fff'; hx.fill();
+  const hd = hx.getImageData(0, 0, w, h).data, H = new Uint8Array(N); for(let i = 0; i < N; i++) H[i] = hd[i*4+3] > 127 ? 1 : 0;
+  const Hin = erode(H), hb = new Uint8Array(N); for(let i = 0; i < N; i++) hb[i] = H[i] && !Hin[i] ? 1 : 0;
+  const band = dilate(hb, 3);
+  const bay = new Uint8Array(N); for(let i = 0; i < N; i++) bay[i] = H[i] && !F[i] ? 1 : 0;
+  const {lab, sizes, n} = label(bay), M = F.slice(); let HA = 0; for(let i = 0; i < N; i++) HA += H[i];
+  if(n){
+    const list = Array.from({length: n+1}, ()=>[]); for(let i = 0; i < N; i++) if(lab[i]) list[lab[i]].push(i);
+    const seen = new Int32Array(N), OFF = [];
+    for(let dy = -2; dy <= 2; dy++) for(let dx = -2; dx <= 2; dx++) if(Math.abs(dx) + Math.abs(dy) <= 2 && (dx || dy)) OFF.push([dx, dy]);
+    for(let L = 1; L <= n; L++){
+      const px = list[L];
+      if(sizes[L] < 150*k*k){ px.forEach(i=>{ M[i] = 1; }); continue; }
+      let ring = 0, sharp = 0, mo = 0, moD = 0;
+      for(const i of px){
+        if(band[i]){ mo++; moD += d[i]; }
+        const xx = i % w, y = (i - xx)/w;
+        for(const [dx, dy] of OFF){ const X = xx + dx, Y = y + dy; if(X < 0 || Y < 0 || X >= w || Y >= h) continue; const j = Y*w + X;
+          if(F[j] && seen[j] !== L){ seen[j] = L; ring++; if(gm[j] > 8) sharp++; } }
+      }
+      const edged = ring ? sharp/ring : 0, mouth = mo ? moD/mo : 0;
+      const leak = mode === 'box' ? !(edged >= 0.93 && sizes[L] >= HA*0.015) : mode === 'free' ? edged < 0.5 : (edged < 0.72 || (edged < 0.8 && mouth >= 1));
+      if(leak) px.forEach(i=>{ M[i] = 1; });   // a leak into the product: fill it back
+    }
+  }
+  // a closed box is its outline (anti-aliased), less any crisp gap that really is background
+  let Mf, nearGap = null;
+  if(mode === 'box'){ Mf = new Uint8Array(N); const gap = new Uint8Array(N); for(let i = 0; i < N; i++){ Mf[i] = hd[i*4+3] && (M[i] || !H[i]) ? 1 : 0; if(H[i] && !M[i]) gap[i] = 1; } nearGap = dilate(gap, 2); }
+  else Mf = keepBig(dilate(erode(M)));
+  // 3. soft edge, then lay the mask over the full-size photo and crop to the product
+  // free shapes: blur the mask a little and re-threshold, which smooths jpeg-ragged edges and drops the white halo
+  let soft = null;
+  if(mode !== 'box'){ const r = Math.max(1, Math.round(w/400)); soft = new Float32Array(N); for(let i = 0; i < N; i++) soft[i] = Mf[i];
+    for(let pass = 0; pass < 2; pass++){ const t = new Float32Array(N);
+      for(let y = 0; y < h; y++){ let acc = 0; const row = y*w; for(let xx = -r; xx < w + r; xx++){ if(xx + r < w) acc += soft[row + Math.min(w-1, xx + r)]; if(xx - r - 1 >= 0) acc -= soft[row + xx - r - 1]; if(xx >= 0 && xx < w) t[row + xx] = acc/(2*r+1); } }
+      for(let xx = 0; xx < w; xx++){ let acc = 0; for(let y = -r; y < h + r; y++){ if(y + r < h) acc += t[Math.min(h-1, y + r)*w + xx]; if(y - r - 1 >= 0) acc -= t[(y - r - 1)*w + xx]; if(y >= 0 && y < h) soft[y*w + xx] = acc/(2*r+1); } } } }
+  const inner = erode(Mf, 2);
+  let L0 = w, R0 = -1, T0 = h, B0 = -1;
+  for(let i = 0; i < N; i++){ let al = 0; if(soft ? soft[i] > 0.5 : Mf[i]){ al = soft ? Math.round(Math.min(1, (soft[i] - 0.5)/0.35)*(soft[i] > 0.999 ? 1 : Math.min(1, d[i]/20))*255) : inner[i] ? 255 : !nearGap[i] ? hd[i*4+3] : Math.round(Math.min(1, d[i]/30)*255); const xx = i % w, y = (i - xx)/w; if(xx < L0) L0 = xx; if(xx > R0) R0 = xx; if(y < T0) T0 = y; if(y > B0) B0 = y; } p[i*4] = p[i*4+1] = p[i*4+2] = 0; p[i*4+3] = al; }
+  if(R0 < L0) return null;
+  x.putImageData(id, 0, 0);
+  const S = Math.max(Math.min(1, k), Math.min(1, 1000/Math.max(W0, H0)), k > 1 ? k : 0), FW = Math.round(W0*S), FH = Math.round(H0*S), f = FW/w;
+  const full = document.createElement('canvas'); full.width = FW; full.height = FH; const fx = full.getContext('2d');
+  fx.drawImage(img, 0, 0, FW, FH); fx.globalCompositeOperation = 'destination-in'; fx.imageSmoothingQuality = 'high'; fx.drawImage(c, 0, 0, FW, FH);
+  const ox0 = Math.max(0, Math.floor(L0*f)), oy0 = Math.max(0, Math.floor(T0*f)), ow = Math.min(FW, Math.ceil((R0+1)*f)) - ox0, oh = Math.min(FH, Math.ceil((B0+1)*f)) - oy0;
+  const o = document.createElement('canvas'); o.width = ow; o.height = oh;
+  o.getContext('2d').drawImage(full, ox0, oy0, ow, oh, 0, 0, ow, oh);
+  return o;
 }
 // The item being checked, resting on the pack: the box if one was picked, otherwise the hits fanned out.
 function bcItem(d){
@@ -2405,7 +2505,7 @@ function itemGroup(it, col){
       // two rows: the most valuable along the front, the rest set back behind them
       const nf = Math.ceil(n/2), rowsDef = [[it.boxes.slice(nf), 300, .74, 190], [it.boxes.slice(0, nf), 340, 1, 0]], badges = [];
       rowsDef.forEach(([row, mh, sc, lift])=>{
-        const ims = row.map(b=>{ const cut = cutoutWhite(b.img, b.key), im = cut || b.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(380/iw, mh/ih)*(sc < 1 ? 1 : 1); return {b, cut, im, w: iw*k, h: ih*k}; });
+        const ims = row.map(b=>{ const cut = cutoutWhite(b.img, b.key, b.key), im = cut || b.img, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(380/iw, mh/ih)*(sc < 1 ? 1 : 1); return {b, cut, im, w: iw*k, h: ih*k}; });
         const gap = sc < 1 ? 26 : 18, tw = ims.reduce((t,o)=>t+o.w, 0) + gap*(ims.length-1); let x = cx - tw/2;
         ims.forEach(o=>{
           const base = floor - lift, y = base - o.h;
@@ -2426,7 +2526,7 @@ function itemGroup(it, col){
     const order = lay.map((_,i)=>i).sort((a,b)=> lay[a][1] - lay[b][1] || b - a);
     const badges = [];
     order.forEach(i=>{
-      const b = it.boxes[i], [dx, sc] = lay[i], cut = cutoutWhite(b.img, b.key), im = cut || b.img;
+      const b = it.boxes[i], [dx, sc] = lay[i], cut = cutoutWhite(b.img, b.key, b.key), im = cut || b.img;
       const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, k = Math.min(maxW/iw, maxH/ih)*sc, w = iw*k, h = ih*k;
       const base = floor - (1 - sc)*150, x = cx + dx - w/2, y = base - h;
       const t = document.createElement('canvas'); t.width = Math.ceil(w); t.height = Math.ceil(h); const tc = t.getContext('2d');
@@ -5171,7 +5271,7 @@ function drawCompare(A, B){
     // soft floor light under the product
     const fl = ctx.createRadialGradient(cx, y + h, 4, cx, y + h, w*0.62); fl.addColorStop(0, hexA(col, .22)); fl.addColorStop(1, hexA(col, 0)); ctx.save(); ctx.translate(cx, y + h); ctx.scale(1, 0.18); ctx.translate(-cx, -(y + h)); ctx.fillStyle = fl; ctx.fillRect(cx - w, y + h - w, w*2, w*2); ctx.restore();
     ctx.save(); ctx.shadowColor = sealed ? 'rgba(0,0,0,.75)' : hexA(col, .35); ctx.shadowBlur = sealed ? 34 : 60; ctx.shadowOffsetY = sealed ? 16 : 10; if(!sealed){ rrect(ctx, x, y, w, h, w*0.045); ctx.fillStyle = '#000'; ctx.fill(); } ctx.drawImage(im, x, y, w, h); ctx.restore();
-    if(sealed){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .08; ctx.shadowColor = col; ctx.shadowBlur = 50; ctx.drawImage(im, x, y, w, h); ctx.restore(); } };
+    if(sealed){ ctx.save(); ctx.shadowColor = hexA(col, .28); ctx.shadowBlur = 50; ctx.drawImage(im, x, y, w, h); ctx.restore(); } };   // coloured glow, without washing the box out
   pic(cmp.a, 270, LIME); pic(cmp.b, 810, WHITE);
   // VS
   ctx.save(); ctx.beginPath(); ctx.arc(540, 220, 44, 0, Math.PI*2); ctx.fillStyle = '#030303'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(244,244,245,.25)'; ctx.stroke();
